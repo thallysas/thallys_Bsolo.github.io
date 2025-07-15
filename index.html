@@ -1,0 +1,2347 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Estaqueamento e Custos - Batessolo Fundações</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+
+    <style>
+        :root {
+            --primary-color: #004a99;
+            --secondary-color: #0066cc;
+            --sidebar-bg: #2d3e50;
+            --sidebar-text: #ecf0f1;
+            --sidebar-active: #3498db;
+            --body-bg: #f4f7f6;
+            --card-bg: #ffffff;
+            --shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            --progress-bg: #e9ecef;
+            --progress-bar-color: #28a745;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: var(--body-bg); 
+            color: #333; 
+        }
+
+        .main-container {
+            display: flex;
+        }
+
+        .sidebar {
+            width: 260px;
+            background-color: var(--sidebar-bg);
+            color: var(--sidebar-text);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            padding: 20px 0;
+            transition: width 0.3s ease;
+            z-index: 1000;
+        }
+
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 20px 20px 20px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        #company-logo-sidebar {
+            height: 50px;
+            width: auto;
+            margin-right: 15px;
+        }
+
+        .sidebar-title h2 {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin: 0;
+        }
+        .sidebar-title p {
+            font-size: 0.8em;
+            opacity: 0.7;
+            margin: 0;
+        }
+
+        .nav-menu {
+            list-style: none;
+            padding: 0;
+            flex-grow: 1;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 15px 25px;
+            color: var(--sidebar-text);
+            text-decoration: none;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .nav-link:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-link.active {
+            background-color: var(--sidebar-active);
+            border-left-color: #ecf0f1;
+            font-weight: 600;
+        }
+
+        .nav-link svg {
+            width: 22px;
+            height: 22px;
+            margin-right: 15px;
+            fill: currentColor;
+        }
+
+        .content-wrapper {
+            margin-left: 260px;
+            width: calc(100% - 260px);
+            padding: 25px;
+            transition: margin-left 0.3s ease, width 0.3s ease;
+        }
+
+        header { 
+            background: var(--card-bg); 
+            border-radius: 15px; 
+            padding: 20px; 
+            margin-bottom: 25px; 
+            box-shadow: var(--shadow); 
+        }
+        
+        .logo-container { display: flex; align-items: center; justify-content: space-between; }
+        #company-logo { height: 60px; width: auto; }
+        #header-text-container h1 { color: var(--primary-color); font-size: 2em; font-weight: 600; }
+        #header-text-container .subtitle { color: #666; font-size: 1.1em; margin-top: 5px; }
+        
+        .upload-section { background: var(--card-bg); border-radius: 15px; padding: 25px; margin-bottom: 25px; box-shadow: var(--shadow); }
+        .upload-box { text-align: center; }
+        .file-upload { position: relative; display: inline-block; width: 100%; max-width: 500px; margin: 0 auto; }
+        .file-input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+        .file-label { display: block; padding: 15px 25px; background: linear-gradient(45deg, var(--primary-color), var(--secondary-color)); color: white; border-radius: 10px; text-align: center; cursor: pointer; transition: all 0.3s ease; font-size: 1.1em; }
+        .file-label:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0, 74, 153, 0.4); }
+        .file-status { margin-top: 15px; padding: 10px; border-radius: 8px; text-align: center; display: none; }
+        .file-status.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .file-status.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        
+        .dashboard-content {
+            display: none; /* Initially hidden */
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .filters-container { background: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 30px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+        .filter-group { display: flex; flex-direction: column; gap: 5px; }
+        .filter-group label { font-size: 0.9em; font-weight: 500; color: #555; }
+        .filter-select, .filter-input, .filter-button { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 1em; min-width: 150px; background: white; }
+        .filter-button { background: #d9534f; color: white; cursor: pointer; border-color: #d43f3a;}
+        .time-filters { display: flex; gap: 10px; flex-wrap: wrap; }
+        .time-filter-btn { padding: 8px 12px; border: 1px solid var(--primary-color); background: white; color: var(--primary-color); border-radius: 6px; cursor: pointer; font-size: 0.9em; transition: all 0.3s ease; height: 38px; }
+        .time-filter-btn.active, .time-filter-btn:hover { background: var(--primary-color); color: white; }
+        .date-range-group { display: flex; gap: 10px; align-items: flex-end; flex-direction: row; }
+        .date-input-group { display: flex; flex-direction: column; gap: 5px; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .kpi-card { background: linear-gradient(135deg, #ffffff, #f8f9fa); border-radius: 12px; padding: 20px; text-align: center; box-shadow: var(--shadow); transition: all 0.3s ease; border: 1px solid rgba(0, 74, 153, 0.1); }
+        .kpi-card:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0, 74, 153, 0.15); }
+        .kpi-card h3 { color: #666; font-size: 0.9em; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; font-weight: 500; }
+        .kpi-value { font-size: 2.2em; font-weight: 700; color: var(--primary-color); margin-bottom: 5px; }
+        .kpi-value.small { font-size: 1.2em; word-wrap: break-word; }
+        .kpi-value.pending { color: #d9534f; }
+        .kpi-unit { color: #888; font-size: 0.85em; }
+        .charts-grid-full, .charts-grid-split { display: grid; gap: 30px; margin-bottom: 30px; }
+        .charts-grid-split { grid-template-columns: 1fr 1fr; }
+        .charts-grid-full { grid-template-columns: 1fr; }
+        .chart-card { background: var(--card-bg); border-radius: 12px; padding: 25px; box-shadow: var(--shadow); position: relative; }
+        .info-card { background: var(--card-bg); border-radius: 12px; padding: 25px; box-shadow: var(--shadow); margin-bottom: 30px; }
+        .info-card h3, .chart-card h3 { color: var(--primary-color); margin-bottom: 20px; text-align: center; font-size: 1.3em; }
+        .chart-large, .chart-medium { height: 400px; }
+        .sub-tabs-header { display: flex; margin-bottom: 20px; border-bottom: 1px solid #ddd; flex-wrap: wrap; }
+        .sub-tab-button { padding: 10px 20px; background: none; border: none; font-size: 1em; font-weight: 500; color: #555; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+        .sub-tab-button.active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+        .sub-tab-content { display: none; padding-top: 20px; }
+        .sub-tab-content.active { display: block; }
+        .table-container { max-height: 500px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; }
+        .sortable-table { width: 100%; border-collapse: collapse; }
+        .sortable-table th, .sortable-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
+        .sortable-table thead th { background-color: #f8f9fa; position: sticky; top: 0; z-index: 1; }
+        .sortable-header { cursor: pointer; position: relative; }
+        .sortable-header::after { content: ''; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: 5px solid transparent; opacity: 0.3; }
+        .sortable-header.sorted-asc::after { border-bottom-color: #333; opacity: 1; }
+        .sortable-header.sorted-desc::after { border-top-color: #333; opacity: 1; }
+        .sortable-table tbody tr:hover { background-color: #f1f1f1; }
+        .sortable-table td:last-child, .sortable-table th:last-child { text-align: right; }
+        .status-pago { color: #155724; font-weight: bold; }
+        .status-previsto { color: #d9534f; font-weight: bold; }
+        .additional-costs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .additional-cost-input { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 1.1em; background-color: #f8f9fa; }
+        #map-container { display: flex; gap: 20px; }
+        #obra-list-container { width: 20%; max-height: 800px; overflow-y: auto; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #ddd; }
+        .obra-list-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; transition: background-color 0.2s; }
+        .obra-list-item:hover { background-color: #f0f8ff; }
+        .obra-list-item.active { background-color: #e6f3ff; font-weight: bold; }
+        #map { width: 80%; height: 800px; border-radius: 8px; z-index: 0; }
+        .presentation-card { background: rgba(255, 255, 255, 0.98); border-radius: 20px; padding: 30px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15); width: 100%; text-align: center; opacity: 1; transform: scale(1); transition: all 0.5s ease-in-out; }
+        .presentation-card.faded-out { opacity: 0; transform: scale(0.95); }
+        .presentation-card h2 { font-size: 2.8em; color: var(--primary-color); margin-bottom: 20px; font-weight: 300; }
+        .presentation-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; }
+        .presentation-kpi { background: #f8f9fa; padding: 15px; border-radius: 15px; border: 1px solid #e9ecef; }
+        .presentation-kpi h3 { font-size: 1.1em; color: #666; font-weight: 500; margin-bottom: 10px; }
+        .presentation-kpi .kpi-value { font-size: 2.5em; }
+        footer { text-align: center; padding: 20px; color: #888; margin-top: 30px; font-size: 0.9em; }
+
+        /* --- ESTILOS CONTROLE DE OBRAS --- */
+        .obra-progress-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 25px;
+        }
+        .obra-progress-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .obra-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+        }
+        .obra-card-header h3 {
+            margin: 0;
+            color: var(--primary-color);
+            font-size: 1.4em;
+        }
+        .obra-coordinates {
+            font-size: 0.8em;
+            color: #777;
+            margin-top: 4px;
+        }
+        .details-toggle-icon {
+            cursor: pointer;
+            font-size: 1.5em;
+            transition: transform 0.3s ease;
+        }
+        .details-toggle-icon.expanded {
+            transform: rotate(180deg);
+        }
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .previsao-termino {
+            font-weight: bold;
+            color: var(--primary-color);
+            font-size: 1.1em;
+        }
+        .progress-bar-container {
+            width: 100%;
+            background-color: var(--progress-bg);
+            border-radius: 25px;
+            height: 25px;
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: var(--progress-bar-color);
+            border-radius: 25px;
+            transition: width 0.5s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .progress-bar-text {
+            color: black; 
+            font-weight: bold;
+            font-size: 0.9em;
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            text-shadow: none;
+        }
+        .section-progress-details, .equipamentos-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            font-size: 0.95em;
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+        }
+        .section-progress-item, .equipamento-item {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        .section-name, .equipamento-name {
+            font-weight: 600;
+        }
+        .equipamento-info {
+            font-size: 1.15em; 
+            color: #333;
+        }
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        .collapsible-content.expanded {
+            padding: 15px;
+            max-height: 1000px;
+            transition: max-height 0.5s ease-in;
+        }
+        .equipamento-details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 15px;
+        }
+        .equipamento-kpi-card {
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            margin-bottom: 10px;
+        }
+        .equipamento-kpi-card h4 {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        .equipamento-kpi-card .kpi-value {
+            font-size: 1.8em;
+        }
+
+        @media (max-width: 992px) { 
+            .sidebar { width: 70px; }
+            .sidebar:hover { width: 260px; }
+            .sidebar .nav-link span, .sidebar .sidebar-title { display: none; }
+            .sidebar:hover .nav-link span, .sidebar:hover .sidebar-title { display: block; }
+            .content-wrapper { margin-left: 70px; width: calc(100% - 70px); }
+            .charts-grid-split { grid-template-columns: 1fr; } 
+            #map-container { flex-direction: column; } 
+            #map, #obra-list-container { width: 100%; max-height: 400px;} 
+        }
+        @media (max-width: 768px) {
+            .main-container { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; position: relative; flex-direction: row; overflow-x: auto; }
+            .sidebar:hover { width: 100%; }
+            .nav-menu { display: flex; flex-direction: row; }
+            .nav-link { border-left: none; border-bottom: 4px solid transparent; }
+            .nav-link.active { border-bottom-color: #ecf0f1; }
+            .sidebar .nav-link span, .sidebar .sidebar-title { display: inline-block; }
+            .content-wrapper { margin-left: 0; width: 100%; padding: 15px; }
+            .filters-container { flex-direction: column; align-items: stretch; }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <img src="https://placehold.co/100x100/004a99/FFFFFF?text=B" alt="Logo da Empresa" id="company-logo-sidebar">
+                <div class="sidebar-title">
+                    <h2>Batessolo</h2>
+                    <p>Fundações</p>
+                </div>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#" class="nav-link active" onclick="switchTab('geral', this)">
+                    <svg viewBox="0 0 24 24"><path d="M16,11.78L20.24,4.45L21.97,5.45L16.74,14.5L10.23,10.75L5.46,19H22V21H2V3H4V17.54L9.5,8L16,11.78Z" /></svg>
+                    <span>Visão Geral</span>
+                </a></li>
+                 <li><a href="#" class="nav-link" onclick="switchTab('controle', this)">
+                    <svg viewBox="0 0 24 24"><path d="M19,3H5C3.9,3 3,3.9 3,5V19C3,20.1 3.9,21 5,21H19C20.1,21 21,20.1 21,19V5C21,3.9 20.1,3 19,3M19,19H5V5H19V19M10,17H8V12H10V17M13,17H11V7H13V17M16,17H14V9H16V17Z"/></svg>
+                    <span>Controle de Obras</span>
+                </a></li>
+                <li><a href="#" class="nav-link" onclick="switchTab('maquina', this)">
+                    <svg viewBox="0 0 24 24"><path d="M4,15V12H6V15H4M18,17.5V16.5H15.5V15H14V11.5H10V15H8.5V16.5H7V17.5H4V19H7V20H8.5V21H10V22H14V21H15.5V20H17V19H20V17.5H18M14,16.5V17.5H10V16.5H14M4,11H20V5H17V2H15V5H9V2H7V5H4V11M9,7H15V9H9V7Z" /></svg>
+                    <span>Análise por Máquina</span>
+                </a></li>
+                <li><a href="#" class="nav-link" onclick="switchTab('funcionario', this)">
+                    <svg viewBox="0 0 24 24"><path d="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z" /></svg>
+                    <span>Análise por Funcionário</span>
+                </a></li>
+                <li><a href="#" class="nav-link" onclick="switchTab('mapa', this)">
+                    <svg viewBox="0 0 24 24"><path d="M12,11.5A2.5,2.5 0 0,1 9.5,9A2.5,2.5 0 0,1 12,6.5A2.5,2.5 0 0,1 14.5,9A2.5,2.5 0 0,1 12,11.5M12,2A7,7 0 0,0 5,9C5,14.25 12,22 12,22C12,22 19,14.25 19,9A7,7 0 0,0 12,2Z" /></svg>
+                    <span>Mapa de Obras</span>
+                </a></li>
+                <li><a href="#" class="nav-link" onclick="switchTab('custos', this)">
+                    <svg viewBox="0 0 24 24"><path d="M7,15H9C9,16.08 10.37,17 12,17C13.63,17 15,16.08 15,15C15,13.9 13.96,13.5 11.76,12.97C9.64,12.44 7,11.78 7,9C7,7.21 8.6,5.5 11,5.5C12.38,5.5 13.5,5.86 14.28,6.5L13.06,7.94C12.6,7.56 11.86,7.25 11,7.25C9.66,7.25 8.75,8.04 8.75,9C8.75,10.04 9.54,10.43 11.78,10.97C14.1,11.54 16.25,12.23 16.25,15C16.25,17.23 14.38,18.5 12,18.5C9.69,18.5 7.68,17.74 6.5,16.5L7.8,15.06C8.5,15.64 9.68,16.25 11,16.25C12.09,16.25 13.25,15.8 13.25,15C13.25,14.2 12.5,13.75 11,13.75C9.5,13.75 8.75,14.2 8.75,15H7Z" /></svg>
+                    <span>Custos</span>
+                </a></li>
+                <li><a href="#" class="nav-link" onclick="switchTab('apresentacao', this)">
+                    <svg viewBox="0 0 24 24"><path d="M21,17H3V5H21M21,3H3C1.89,3 1,3.89 1,5V17C1,18.1 1.9,19 3,19H8V21H16V19H21C22.1,19 23,18.1 23,17V5C23,3.89 22.1,3 21,3Z" /></svg>
+                    <span>Apresentação</span>
+                </a></li>
+            </ul>
+        </nav>
+
+        <div class="content-wrapper">
+            <header>
+                <div class="logo-container">
+                    <div id="header-text-container">
+                        <h1>Dashboard de Produção e Custos</h1>
+                        <p class="subtitle">Análise de Desempenho Operacional e Financeiro</p>
+                    </div>
+                    <img src="https://placehold.co/200x60/004a99/FFFFFF?text=Batessolo" alt="Logo da Empresa" id="company-logo">
+                </div>
+            </header>
+            
+            <section class="upload-section">
+                <div class="upload-box">
+                    <p style="margin-bottom: 10px; color: #666;">Carregue o arquivo de dados consolidado:</p>
+                    <div class="file-upload">
+                        <input type="file" id="singleFileInput" class="file-input" accept=".json">
+                        <label for="singleFileInput" class="file-label">📤 Carregar Dados_Batessolo.json</label>
+                    </div>
+                    <div id="fileStatus" class="file-status"></div>
+                </div>
+            </section>
+
+            <main class="dashboard-content" id="dashboardContent">
+                <div id="tab-geral" class="tab-content active"></div>
+                <div id="tab-controle" class="tab-content"></div>
+                <div id="tab-maquina" class="tab-content"></div>
+                <div id="tab-funcionario" class="tab-content"></div>
+                <div id="tab-mapa" class="tab-content"></div>
+                <div id="tab-custos" class="tab-content"></div>
+                <div id="tab-apresentacao" class="tab-content"></div>
+            </main>
+
+            <footer>
+                <p>© 2025 Batessolo Fundações | Desenvolvido por Thallys | Contato: thallyssoares13@gmail.com</p>
+            </footer>
+        </div>
+    </div>
+    
+    <template id="template-tab-geral">
+        <div class="filters-container">
+            <div class="filter-group"><label>Filtrar por Máquina:</label><select id="filterMaquinaGeral" class="filter-select"><option value="all">Todas as máquinas</option></select></div>
+            <div class="filter-group"><label>Filtrar por Funcionário:</label><select id="filterFuncionarioGeral" class="filter-select"><option value="all">Todos os funcionários</option></select></div>
+            <div class="filter-group"><label>Período:</label><div id="geralTimeFilters" class="time-filters"><button class="time-filter-btn active" data-period="all">Todos</button><button class="time-filter-btn" data-period="7d">7 dias</button><button class="time-filter-btn" data-period="30d">30 dias</button><button class="time-filter-btn" data-period="3m">3 meses</button><button class="time-filter-btn" data-period="1y">1 ano</button></div></div>
+            <div class="filter-group date-range-group"><div class="date-input-group"><label for="startDateGeral">Início:</label><input type="date" id="startDateGeral" class="filter-input"></div><div class="date-input-group"><label for="endDateGeral">Fim:</label><input type="date" id="endDateGeral" class="filter-input"></div></div>
+            <div class="filter-group"><label>Agrupar por:</label><div id="geralAggregationFilters" class="time-filters aggregation-filters"><button class="time-filter-btn active" data-aggregation="daily">Diário</button><button class="time-filter-btn" data-aggregation="monthly">Mensal</button><button class="time-filter-btn" data-aggregation="yearly">Anual</button></div></div>
+        </div>
+        <div class="kpi-grid">
+            <div class="kpi-card"><h3>Total de Metragem</h3><div class="kpi-value" id="geral-totalMetragem">-</div><div class="kpi-unit">metros</div></div>
+            <div class="kpi-card"><h3>Total de Operações</h3><div class="kpi-value" id="geral-totalOperacoes">-</div><div class="kpi-unit">operações</div></div>
+            <div class="kpi-card"><h3>Média por Operação</h3><div class="kpi-value" id="geral-mediaOperacao">-</div><div class="kpi-unit">m/operação</div></div>
+            <div class="kpi-card"><h3>Obras Atendidas</h3><div class="kpi-value" id="geral-obrasAtivas">-</div><div class="kpi-unit">obras</div></div>
+        </div>
+    
+        <div class="kpi-grid" style="grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px;">
+            <div class="kpi-card"><h3>Metragem Bate-Estacas</h3><div class="kpi-value" id="geral-totalMetragemBE">-</div><div class="kpi-unit">metros</div></div>
+            <div class="kpi-card"><h3>Metragem Hélices</h3><div class="kpi-value" id="geral-totalMetragemHC">-</div><div class="kpi-unit">metros</div></div>
+        </div>
+        <div class="charts-grid-full" style="margin-bottom: 40px;"><div class="chart-card chart-large"><h3>Gráfico de Área da Evolução da Metragem</h3><canvas id="chartEvolucaoGeral"></canvas></div></div>
+        
+        <div class="kpi-grid" style="grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px;">
+            <div class="kpi-card"><h3>Faturamento Bate-Estacas</h3><div class="kpi-value" id="geral-totalFaturamentoBE">-</div><div class="kpi-unit">reais</div></div>
+            <div class="kpi-card"><h3>Faturamento Hélices</h3><div class="kpi-value" id="geral-totalFaturamentoHC">-</div><div class="kpi-unit">reais</div></div>
+        </div>
+        <div class="charts-grid-full"><div class="chart-card chart-large"><h3>Gráfico de Área da Evolução do Faturamento</h3><canvas id="chartEvolucaoFaturamento"></canvas></div></div>
+    
+        <div class="charts-grid-split">
+            <div class="chart-card chart-medium"><h3>Produção por Equipe (Operador Principal)</h3><canvas id="chartOperadorGeral"></canvas></div>
+            <div class="chart-card chart-medium"><h3>Produção por Máquina</h3><canvas id="chartMaquinaGeral"></canvas></div>
+        </div>
+        <div class="charts-grid-split">
+            <div class="chart-card chart-medium"><h3>Metragem por Seção (Bate-Estaca)</h3><canvas id="chartBateEstacaPorTamanho"></canvas></div>
+            <div class="chart-card chart-medium"><h3>Metragem por Diâmetro (Hélice)</h3><canvas id="chartHelicePorTamanho"></canvas></div>
+        </div>
+    </template>
+    
+    <template id="template-tab-controle">
+        <div class="info-card">
+            <h3>Andamento das Obras</h3>
+            <p style="text-align: center; margin-top: -15px; margin-bottom: 20px; color: #888;">
+                Visualização do progresso das obras com status "Em andamento".
+            </p>
+            <div id="controle-obras-grid" class="obra-progress-grid">
+                </div>
+        </div>
+    </template>
+
+    <template id="template-tab-maquina">
+        <div class="filters-container"><div class="filter-group"><label>Máquina:</label><select id="filterMaquina" class="filter-select"><option value="all">Todas as máquinas</option></select></div><div class="filter-group"><label>Período:</label><div id="maquinaTimeFilters" class="time-filters"><button class="time-filter-btn active" data-period="all">Todos</button><button class="time-filter-btn" data-period="7d">7 dias</button><button class="time-filter-btn" data-period="30d">30 dias</button><button class="time-filter-btn" data-period="3m">3 meses</button><button class="time-filter-btn" data-period="1y">1 ano</button></div></div><div class="filter-group date-range-group"><div class="date-input-group"><label for="startDateMaquina">Início:</label><input type="date" id="startDateMaquina" class="filter-input"></div><div class="date-input-group"><label for="endDateMaquina">Fim:</label><input type="date" id="endDateMaquina" class="filter-input"></div></div><div class="filter-group"><label>Agrupar por:</label><div id="maquinaAggregationFilters" class="time-filters aggregation-filters"><button class="time-filter-btn active" data-aggregation="daily">Diário</button><button class="time-filter-btn" data-aggregation="monthly">Mensal</button><button class="time-filter-btn" data-aggregation="yearly">Anual</button></div></div></div>
+        <div class="sub-tabs-header"><button class="sub-tab-button active" onclick="switchSubTab('produtividade', this)">Produtividade</button><button class="sub-tab-button" onclick="switchSubTab('custos', this)">Custos</button><button class="sub-tab-button" onclick="switchSubTab('renda', this)">Renda & Lucratividade</button><button class="sub-tab-button" onclick="switchSubTab('fontesRenda', this)">Fontes de Renda</button></div>
+        
+        <div id="sub-tab-produtividade" class="sub-tab-content active"><div class="kpi-grid"><div class="kpi-card"><h3>Produção Total</h3><div class="kpi-value" id="maquina-producaoTotal">-</div><div class="kpi-unit">metros</div></div><div class="kpi-card"><h3>Obras Participadas</h3><div class="kpi-value" id="maquina-obrasParticipadas">-</div><div class="kpi-unit">obras</div></div><div class="kpi-card"><h3>Dias Trabalhados</h3><div class="kpi-value" id="maquina-diasTrabalhados">-</div><div class="kpi-unit">dias</div></div><div class="kpi-card"><h3>Média de Produção</h3><div class="kpi-value" id="maquina-mediaProducao">-</div><div class="kpi-unit">m/dia</div></div></div><div class="charts-grid-full"><div class="chart-card chart-large"><h3>Evolução da Metragem</h3><canvas id="chartEvolucaoMaquina"></canvas></div></div></div>
+        
+        <div id="sub-tab-custos" class="sub-tab-content">
+            <div class="filters-container" style="background: #fff; padding: 15px; margin-bottom: 20px;">
+                <div class="filter-group">
+                    <label>Filtrar por Status:</label>
+                    <select id="filterMaquinaCustoStatus" class="filter-select">
+                        <option value="all">Todos</option>
+                        <option value="Pago">Pago</option>
+                        <option value="Previsto">Previsto</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Filtrar por Sub-categoria:</label>
+                    <select id="filterMaquinaCustoSubCategoria" class="filter-select">
+                        <option value="all">Todas</option>
+                    </select>
+                </div>
+            </div>
+            <div class="kpi-grid"><div class="kpi-card"><h3>Custo Total</h3><div class="kpi-value" id="maquina-custoTotal">-</div><div class="kpi-unit">Pago + Previsto</div></div><div class="kpi-card"><h3>Qtd. de Custos</h3><div class="kpi-value" id="maquina-qtdCustos">-</div><div class="kpi-unit">lançamentos</div></div><div class="kpi-card"><h3>Qtd. Pagos</h3><div class="kpi-value" id="maquina-qtdPagos">-</div><div class="kpi-unit">lançamentos</div></div><div class="kpi-card"><h3>Qtd. Pendentes</h3><div class="kpi-value pending" id="maquina-qtdPendentes">-</div><div class="kpi-unit">lançamentos</div></div></div><div class="charts-grid-full"><div class="chart-card chart-large"><h3>Evolução dos Custos da Máquina</h3><canvas id="chartEvolucaoCustoMaquina"></canvas></div></div>
+            <div class="charts-grid-split">
+                <div class="chart-card chart-medium"><h3>Top 5 Sub-categorias de Custo</h3><canvas id="chartCustoPorSubCategoriaSub"></canvas></div>
+                <div class="chart-card chart-medium"><h3>Top 5 Descrições de Custo</h3><canvas id="chartCustoPorDescricaoSub"></canvas></div>
+            </div>
+            <div class="info-card"><h3>Detalhes dos Custos da Máquina</h3><input type="text" id="machineCostsSearchInput" class="filter-input" placeholder="🔎 Pesquisar na descrição..." style="width:100%; margin-bottom: 15px;">
+                <div class="table-container">
+                    <table id="machineCostsTable" class="sortable-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable-header" data-column="descricao">Descrição</th>
+                                <th class="sortable-header" data-column="normalized_category">Máquina</th>
+                                <th class="sortable-header" data-column="sub_categoria">Sub-categoria</th>
+                                <th class="sortable-header" data-column="parsedPaymentDate">Data Pagamento</th>
+                                <th class="sortable-header" data-column="status">Status</th>
+                                <th class="sortable-header" data-column="custo">Custo (R$)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="machineCostsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div id="sub-tab-renda" class="sub-tab-content">
+            <div class="info-card">
+                <h3>Simulação de Custos Adicionais</h3>
+                <p style="text-align: center; margin-top: -15px; margin-bottom: 20px; color: #888;">
+                    Preencha os campos abaixo para recalcular o Lucro e a Margem em tempo real.
+                </p>
+                <div class="additional-costs-grid">
+                    <div class="filter-group">
+                        <label for="custo-viagem">Custo com folha de Pagamento (R$):</label>
+                        <input type="number" id="custo-viagem" class="additional-cost-input" placeholder="0.00" min="0" step="50">
+                    </div>
+                    <div class="filter-group">
+                        <label for="custo-alimentacao">Custo com terceiros (R$):</label>
+                        <input type="number" id="custo-alimentacao" class="additional-cost-input" placeholder="0.00" min="0" step="50">
+                    </div>
+                    <div class="filter-group">
+                        <label for="custo-outros">Outros Custos (R$):</label>
+                        <input type="number" id="custo-outros" class="additional-cost-input" placeholder="0.00" min="0" step="50">
+                    </div>
+                </div>
+            </div>
+            <div class="kpi-grid">
+                <div class="kpi-card"><h3>Faturamento Total</h3><div class="kpi-value" id="renda-faturamentoTotal">-</div><div class="kpi-unit">reais</div></div>
+                <div class="kpi-card"><h3>Custo Total</h3><div class="kpi-value" id="renda-custoTotal">-</div><div class="kpi-unit">reais</div></div>
+                <div class="kpi-card"><h3>Lucro Bruto</h3><div class="kpi-value" id="renda-lucroBruto">-</div><div class="kpi-unit">reais</div></div>
+                <div class="kpi-card"><h3>Margem de Lucro</h3><div class="kpi-value" id="renda-margemLucro">-</div><div class="kpi-unit">%</div></div>
+            </div>
+             <div class="charts-grid-full"><div class="chart-card chart-large"><h3>Evolução da Lucratividade da Máquina</h3><canvas id="chartLucratividadeMaquina"></canvas></div></div>
+        </div>
+
+        <div id="sub-tab-fontesRenda" class="sub-tab-content">
+            <div class="kpi-grid">
+                <div class="kpi-card"><h3>Receita: Mobilização</h3><div class="kpi-value" id="fontes-mobilizacao">-</div><div class="kpi-unit">reais</div></div>
+                <div class="kpi-card"><h3>Receita: Transp. Equip.</h3><div class="kpi-value" id="fontes-transporteEquip">-</div><div class="kpi-unit">reais</div></div>
+                <div class="kpi-card"><h3>Receita: Transp. Acess.</h3><div class="kpi-value" id="fontes-transporteAcess">-</div><div class="kpi-unit">reais</div></div>
+                <div class="kpi-card"><h3>Receita: Taxa Técnica</h3><div class="kpi-value" id="fontes-taxaTecnica">-</div><div class="kpi-unit">reais</div></div>
+            </div>
+            <div class="charts-grid-split">
+                <div class="info-card"><h3>Análise por Seção (Bate-Estaca)</h3><div class="table-container"><table class="sortable-table"><thead><tr><th>Seção</th><th>Metragem Total</th><th>Faturamento Total</th></tr></thead><tbody id="detalhesBateEstaca"></tbody></table></div></div>
+                <div class="info-card"><h3>Análise por Diâmetro (Hélice)</h3><div class="table-container"><table class="sortable-table"><thead><tr><th>Diâmetro (cm)</th><th>Metragem Total</th><th>Faturamento Total</th></tr></thead><tbody id="detalhesHelice"></tbody></table></div></div>
+            </div>
+             <div class="charts-grid-split"><div class="chart-card chart-medium"><h3>Metragem por Seção (Bate-Estaca)</h3><canvas id="sizeChartBateEstacaSub"></canvas></div><div class="chart-card chart-medium"><h3>Metragem por Diâmetro (Hélice)</h3><canvas id="sizeChartHeliceSub"></canvas></div></div>
+        </div>
+    </template>
+    
+    <template id="template-tab-funcionario">
+        <div class="filters-container"><div class="filter-group"><label>Funcionário (Operador ou Auxiliar):</label><select id="filterFuncionario" class="filter-select"><option value="all">Todos os funcionários</option></select></div><div class="filter-group"><label>Período:</label><div id="funcionarioTimeFilters" class="time-filters"><button class="time-filter-btn active" data-period="all">Todos</button><button class="time-filter-btn" data-period="7d">7 dias</button><button class="time-filter-btn" data-period="30d">30 dias</button><button class="time-filter-btn" data-period="3m">3 meses</button><button class="time-filter-btn" data-period="1y">1 ano</button></div></div><div class="filter-group date-range-group"><div class="date-input-group"><label for="startDateFuncionario">Início:</label><input type="date" id="startDateFuncionario" class="filter-input"></div><div class="date-input-group"><label for="endDateFuncionario">Fim:</label><input type="date" id="endDateFuncionario" class="filter-input"></div></div><div class="filter-group"><label>Agrupar por:</label><div id="funcionarioAggregationFilters" class="time-filters aggregation-filters"><button class="time-filter-btn active" data-aggregation="daily">Diário</button><button class="time-filter-btn" data-aggregation="monthly">Mensal</button><button class="time-filter-btn" data-aggregation="yearly">Anual</button></div></div></div>
+        <div class="kpi-grid"><div class="kpi-card"><h3>Produção Total da Equipe</h3><div class="kpi-value" id="funcionario-producaoTotal">-</div><div class="kpi-unit">metros</div></div><div class="kpi-card"><h3>Obras Participadas</h3><div class="kpi-value" id="funcionario-obrasParticipadas">-</div><div class="kpi-unit">obras</div></div><div class="kpi-card"><h3>Dias Trabalhados</h3><div class="kpi-value" id="funcionario-diasTrabalhados">-</div><div class="kpi-unit">dias</div></div><div class="kpi-card"><h3>Comissão Estimada</h3><div class="kpi-value" id="funcionario-comissao">-</div><div class="kpi-unit">reais</div></div></div>
+        <div class="charts-grid-full"><div class="chart-card chart-large"><h3>Evolução da Produção da Equipe</h3><canvas id="chartEvolucaoFuncionario"></canvas></div></div>
+    </template>
+    
+    <template id="template-tab-mapa">
+        <div class="filters-container">
+            <div class="filter-group"><label>Filtrar por Máquina:</label><select id="filterMaquinaMapa" class="filter-select"><option value="all">Todas as máquinas</option></select></div>
+            <div class="filter-group"><label>Pesquisar Obra:</label><input type="text" id="obraSearchInput" class="filter-input" placeholder="Digite o nome da obra..."></div>
+            <div class="filter-group"><label>Período:</label><div id="mapaTimeFilters" class="time-filters"><button class="time-filter-btn active" data-period="all">Todos</button><button class="time-filter-btn" data-period="7d">7 dias</button><button class="time-filter-btn" data-period="30d">30 dias</button><button class="time-filter-btn" data-period="3m">3 meses</button><button class="time-filter-btn" data-period="1y">1 ano</button></div></div>
+            <div class="filter-group date-range-group"><div class="date-input-group"><label for="startDateMapa">Início:</label><input type="date" id="startDateMapa" class="filter-input"></div><div class="date-input-group"><label for="endDateMapa">Fim:</label><input type="date" id="endDateMapa" class="filter-input"></div></div>
+            <div class="filter-group"><button id="clearObraFilter" class="filter-button" style="height:38px; align-self: flex-end;">Limpar Filtro de Obra</button></div>
+        </div>
+       <div class="kpi-grid" id="mapaKpiGrid">
+    <div class="kpi-card"><h3>Metragem Total (Obra)</h3><div class="kpi-value" id="mapa-totalMetragem">-</div><div class="kpi-unit">metros</div></div>
+    <div class="kpi-card"><h3>Duração</h3><div class="kpi-value" id="mapa-duracao">-</div><div class="kpi-unit">dias</div></div>
+    <div class="kpi-card"><h3>Faturamento da Obra</h3><div class="kpi-value" id="mapa-faturamento">-</div><div class="kpi-unit">reais</div></div>
+    
+    <div class="kpi-card">
+        <h3>Média Diária</h3>
+        <div class="kpi-value" id="mapa-mediaDiaria">-</div>
+        <div class="kpi-unit">m/dia</div>
+    </div>
+
+    <div class="kpi-card"><h3>Equipamentos</h3><div class="kpi-value small" id="mapa-equipamentos">-</div><div class="kpi-unit">na obra</div></div>
+</div>
+        <div id="map-container">
+            <div id="obra-list-container"></div>
+            <div id="map"></div>
+        </div>
+    </template>
+
+    <template id="template-tab-custos">
+        <div class="filters-container">
+            <div class="filter-group"><label>Categoria Principal:</label><select id="filterCustoCategoria" class="filter-select"><option value="all">Todas</option><option value="Maquinas">Máquinas</option><option value="Pátio">Pátio</option><option value="Escritório">Escritório</option></select></div>
+            <div class="filter-group" id="maquinaCustoFilterGroup" style="display: none;"><label>Máquina Específica:</label><select id="filterCustoMaquina" class="filter-select"><option value="all">Todas as máquinas</option></select></div>
+            <div class="filter-group"><label>Sub-categoria:</label><select id="filterCustoSubCategoria" class="filter-select"><option value="all">Todas</option></select></div>
+            <div class="filter-group"><label>Status:</label><select id="filterCustoStatus" class="filter-select"><option value="all">Todos</option><option value="Pago">Pago</option><option value="Previsto">Previsto</option></select></div>
+            <div class="filter-group"><label>Período:</label><div id="custoTimeFilters" class="time-filters"><button class="time-filter-btn active" data-period="all">Todos</button><button class="time-filter-btn" data-period="7d">7 dias</button><button class="time-filter-btn" data-period="30d">30 dias</button><button class="time-filter-btn" data-period="3m">3 meses</button><button class="time-filter-btn" data-period="1y">1 ano</button></div></div>
+            <div class="filter-group date-range-group"><div class="date-input-group"><label for="startDateCusto">Data Pag. Início:</label><input type="date" id="startDateCusto" class="filter-input"></div><div class="date-input-group"><label for="endDateCusto">Data Pag. Fim:</label><input type="date" id="endDateCusto" class="filter-input"></div></div>
+            <div class="filter-group"><label>Agrupar Gráfico por:</label><div id="custoAggregationFilters" class="time-filters aggregation-filters"><button class="time-filter-btn" data-aggregation="daily">Diário</button><button class="time-filter-btn active" data-aggregation="monthly">Mensal</button><button class="time-filter-btn" data-aggregation="yearly">Anual</button></div></div>
+        </div>
+        <div class="kpi-grid"><div class="kpi-card"><h3>Custo Total (Pago)</h3><div class="kpi-value" id="custos-total">-</div><div class="kpi-unit">reais</div></div><div class="kpi-card"><h3>Custos Pendentes</h3><div class="kpi-value pending" id="custos-pendente">-</div><div class="kpi-unit">reais</div></div></div>
+        <div class="charts-grid-split"><div class="chart-card chart-medium"><h3>Custos por Categoria</h3><canvas id="chartCustoPorCategoria"></canvas></div><div class="chart-card chart-medium"><h3>Custos por Sub-categoria</h3><canvas id="chartCustoPorSubCategoria"></canvas></div></div>
+        <div class="charts-grid-full"><div class="chart-card chart-large"><h3>Evolução dos Custos (Pagos)</h3><canvas id="chartEvolucaoCustos"></canvas></div></div>
+       <div class="info-card"><h3>Detalhes dos Custos</h3><input type="text" id="costsSearchInput" class="filter-input" placeholder="🔎 Pesquisar na descrição..." style="width:100%; margin-bottom: 15px;"><div class="table-container"><table id="costsTable" class="sortable-table"><thead><tr><th class="sortable-header" data-column="descricao">Descrição</th><th class="sortable-header" data-column="normalized_category">Categoria</th><th class="sortable-header" data-column="sub_categoria">Sub-categoria</th><th class="sortable-header" data-column="parsedPaymentDate">Data Pagamento</th><th class="sortable-header" data-column="status">Status</th><th class="sortable-header" data-column="custo">Custo (R$)</th></tr></thead><tbody id="costsTableBody"></tbody></table></div></div>
+    </template>
+    
+    <template id="template-tab-apresentacao">
+        <h3 style="text-align: center; color: #004a99; margin-bottom: 15px;">Desempenho das Hélices (30 Dias)</h3>
+        <div class="kpi-grid"><div class="kpi-card"><h3>METRAGEM HÉLICE (30D)</h3><div class="kpi-value" id="apresentacao-metragemHelices">-</div><div class="kpi-unit">metros</div></div><div class="kpi-card"><h3>Total Operações</h3><div class="kpi-value" id="apresentacao-operacoesHelices">-</div><div class="kpi-unit">operações</div></div><div class="kpi-card"><h3>Média por Operação</h3><div class="kpi-value" id="apresentacao-mediaHelices">-</div><div class="kpi-unit">m/operação</div></div><div class="kpi-card"><h3>Obras Atendidas</h3><div class="kpi-value" id="apresentacao-obrasHelices">-</div><div class="kpi-unit">obras</div></div></div>
+        <h3 style="text-align: center; color: #004a99; margin-bottom: 15px; margin-top: 30px;">Desempenho dos Bate-Estacas (30 Dias)</h3>
+        <div class="kpi-grid"><div class="kpi-card"><h3>TOTAL BATE-ESTACA (30D)</h3><div class="kpi-value" id="apresentacao-metragemBateEstacas">-</div><div class="kpi-unit">metros</div></div><div class="kpi-card"><h3>Total Operações</h3><div class="kpi-value" id="apresentacao-operacoesBateEstacas">-</div><div class="kpi-unit">operações</div></div><div class="kpi-card"><h3>Média por Operação</h3><div class="kpi-value" id="apresentacao-mediaBateEstacas">-</div><div class="kpi-unit">m/operação</div></div><div class="kpi-card"><h3>Obras Atendidas</h3><div class="kpi-value" id="apresentacao-obrasBateEstacas">-</div><div class="kpi-unit">obras</div></div></div>
+        <hr style="margin: 40px 0; border: 1px solid #e9ecef;">
+        <div class="charts-grid-full">
+            <div class="presentation-card" id="presentation-card">
+                <h2 id="slide-machine-name">Carregando...</h2>
+                <div class="presentation-kpi-grid">
+                    <div class="presentation-kpi"><h3>Produção (30 dias)</h3><div class="kpi-value" id="slide-producao">-</div><div class="kpi-unit">metros</div></div>
+                    <div class="presentation-kpi"><h3>Dias Trabalhados</h3><div class="kpi-value" id="slide-dias">-</div><div class="kpi-unit">dias</div></div>
+                    <div class="presentation-kpi"><h3>Média Diária</h3><div class="kpi-value" id="slide-media">-</div><div class="kpi-unit">m/dia</div></div>
+                </div>
+            </div>
+        </div>
+        <div class="charts-grid-full"><div class="chart-card chart-large"><h3>Produção Geral Mensal (Últimos 12 Meses)</h3><canvas id="chartEvolucaoApresentacao"></canvas></div></div>
+    </template>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script>
+        // --- INÍCIO DO CÓDIGO JAVASCRIPT ---
+        function debounce(func, delay) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), delay);
+            };
+        }
+
+        // --- VARIÁVEIS GLOBAIS ---
+        let allObrasData = {}; 
+        let productionData = [];
+        let costData = [];
+        let charts = {};
+        let columnNames = {};
+        let map;
+        let markersGroup;
+        let selectedObraFilter = null; 
+
+        let currentAggregation = {
+            geral: 'daily',
+            maquina: 'daily',
+            funcionario: 'daily',
+            custos: 'monthly',
+            mapa: 'monthly'
+        };
+        let costSortState = {
+            costsTable: { column: 'parsedPaymentDate', direction: 'desc' },
+            machineCostsTable: { column: 'parsedPaymentDate', direction: 'desc' }
+        };
+        let slideshowInterval = null;
+        let slideshowMachines = [];
+        let currentSlideIndex = 0;
+        
+        const machineCategoryMap = {
+            'BE_01': 'BE-01', 'BE_02': 'BE-02', 'BE_03': 'BE-03', 'BE_04': 'BE-04', 'BE_05': 'BE-05', 
+            'BEH_01': 'BEH-01', 'BEH_06': 'BEH-06', 'BP_01': 'BP-01', 'BP_02': 'BP-02', 
+            'HC-01': 'HC-01', 'HC-02': 'HC-02', 'HC-03': 'HC-03',
+            'BE_01 Rogerio': 'BE-01', 'BE_02 Elivelton': 'BE-02', 'BE_03 Parada': 'BE-03',
+            'BE_04 Parada': 'BE-04', 'BE_05 Raimundo': 'BE-05', 'BEH_01 Rogerio': 'BEH-01',
+            'BEH_06 Rogerio': 'BEH-06', 'BP_01 Robson': 'BP-01', 'BP_02 Silverio': 'BP-02',
+            'HC_01 Fabio': 'HC-01', 'HC_02 Samuel': 'HC-02'
+        };
+
+        const bateEstacaSizes = ['16x16', '18x18', '20x20', '23x23', '26x26', '30x30'];
+        const heliceSizes = ['30', '40', '50', '60', '70', '80'];
+        const allSizeColumns = [...bateEstacaSizes, ...heliceSizes];
+
+        // --- INICIALIZAÇÃO ---
+        const singleFileInput = document.getElementById('singleFileInput');
+        const dashboardContent = document.getElementById('dashboardContent');
+
+        singleFileInput.addEventListener('change', handleSingleFileUpload);
+        
+        // --- FUNÇÕES DE MANIPULAÇÃO DE DADOS ---
+
+        function handleSingleFileUpload(event) {
+            const file = event.target.files[0];
+            const fileStatus = document.getElementById('fileStatus');
+            if (!file) return;
+            if (!file.name.toLowerCase().endsWith('.json')) {
+                showFileStatus('Erro: Arquivo deve ser .json', 'error');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsedData = JSON.parse(e.target.result);
+                    
+                    // Lógica para lidar com diferentes nomes de chave no JSON
+                    const production = parsedData.dados_metragem || parsedData.productionData;
+                    const costs = parsedData.dados_custos || parsedData.custos;
+                    const obrasData = parsedData.dados_obras || parsedData.obras_detalhadas;
+
+                    if (!production || !costs || !obrasData) {
+                         throw new Error("Arquivo JSON inválido. Faltam as chaves 'dados_metragem'/'productionData', 'dados_custos'/'custos' ou 'dados_obras'/'obras_detalhadas'.");
+                    }
+                    
+                    processProductionData(production);
+                    processCostData(costs);
+                    allObrasData = obrasData.obras || obrasData;
+
+                    document.querySelector('.upload-section').style.display = 'none';
+                    dashboardContent.style.display = 'block';
+                    showFileStatus('✅ Arquivo carregado com sucesso!', 'success');
+                    initializeDashboard();
+
+                } catch (error) {
+                    console.error("ERRO AO PROCESSAR ARQUIVO:", error);
+                    showFileStatus(`❌ Erro ao processar. ${error.message}`, 'error');
+                }
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function showFileStatus(message, type, elementId = 'fileStatus') {
+            const statusEl = document.getElementById(elementId);
+            statusEl.textContent = message;
+            statusEl.className = `file-status ${type}`;
+            statusEl.style.display = 'block';
+        }
+        
+        function cleanAndParseFloat(value) {
+            if (typeof value === 'number') return value;
+            if (typeof value !== 'string' || !value) return 0;
+            
+            let s = String(value)
+                .replace(/\./g, '') 
+                .replace(/,+/g, '.'); 
+            
+            const num = parseFloat(s);
+            return isNaN(num) ? 0 : num;
+        }
+
+        function processProductionData(data) {
+            if (!Array.isArray(data)) { throw new TypeError("O conteúdo de 'metragem' não é um array válido."); }
+            columnNames = getColumnNames(data);
+            productionData = data.map(item => {
+                if (!item) return null;
+                return {
+                ...item,
+                parsedDate: parseDate(item[columnNames.data]),
+                faturamento: calculateFaturamentoForRow(item)
+            }}).filter(Boolean);
+            productionData.sort((a, b) => (b.parsedDate || 0) - (a.parsedDate || 0));
+        }
+        
+        function calculateFaturamentoForRow(row) {
+            if (!row) return 0;
+            
+            let baseRevenue = 0;
+            const metragem = parseFloat(row['Metragem']) || 0;
+            const rendaPorMetro = parseFloat(row['Renda por metro']) || 0;
+            const faturamentoMinimo = parseFloat(row['Faturamento minimo']) || 0;
+
+            if (rendaPorMetro > 0) {
+                baseRevenue = metragem * rendaPorMetro;
+            } else { 
+                heliceSizes.forEach(size => {
+                    const metragemDaSecao = parseFloat(row[size]) || 0;
+                    if (metragemDaSecao > 0) {
+                        const rpm = parseFloat(row[`Renda por metro ${size}`]) || 0;
+                        baseRevenue += metragemDaSecao * rpm;
+                    }
+                });
+            }
+
+            if (faturamentoMinimo > 0 && baseRevenue < faturamentoMinimo && metragem > 0) {
+                 baseRevenue = faturamentoMinimo;
+            }
+            
+            const extras = (parseFloat(row['Hora parada']) || 0) +
+                           (parseFloat(row['Transporte do equipamento']) || parseFloat(row['Transporte Equipamento']) || 0) +
+                           (parseFloat(row['Transporte dos acessórios']) || 0) +
+                           (parseFloat(row['Taxa tecnica']) || 0) +
+                           (parseFloat(row['Mobilização']) || 0);
+
+            return baseRevenue + extras;
+        }
+
+        function processCostData(data) {
+            if (!Array.isArray(data)) { return; } 
+            costData = data.map(item => {
+                if (!item || typeof item !== 'object') return null;
+                const normalizedCategory = machineCategoryMap[item.categoria] || item.categoria;
+                let mainCategory = 'Outros';
+                if (['Pátio', 'Escritório'].includes(item.categoria)) {
+                    mainCategory = item.categoria;
+                } else if (Object.keys(machineCategoryMap).includes(item.categoria)) {
+                    mainCategory = 'Maquinas';
+                }
+                return { 
+                    ...item, 
+                    custo: cleanAndParseFloat(item.custo), 
+                    parsedPaymentDate: parseDate(item.data_pagamento), 
+                    parsedDueDate: parseDate(item.data_vencimento), 
+                    normalized_category: normalizedCategory, 
+                    main_category: mainCategory 
+                };
+            }).filter(Boolean);
+        }
+
+        // --- LÓGICA DO DASHBOARD ---
+        
+        function initializeDashboard() {
+            populateTabContent();
+            addEventListeners();
+            populateFilters();
+            setupCostFilters();
+            updateAllTabs();
+        }
+
+        function populateTabContent() {
+            document.getElementById('tab-geral').innerHTML = document.getElementById('template-tab-geral').innerHTML;
+            document.getElementById('tab-controle').innerHTML = document.getElementById('template-tab-controle').innerHTML;
+            document.getElementById('tab-maquina').innerHTML = document.getElementById('template-tab-maquina').innerHTML;
+            document.getElementById('tab-funcionario').innerHTML = document.getElementById('template-tab-funcionario').innerHTML;
+            document.getElementById('tab-mapa').innerHTML = document.getElementById('template-tab-mapa').innerHTML;
+            document.getElementById('tab-custos').innerHTML = document.getElementById('template-tab-custos').innerHTML;
+            document.getElementById('tab-apresentacao').innerHTML = document.getElementById('template-tab-apresentacao').innerHTML;
+        }
+        
+        const debouncedUpdateCustos = debounce(updateCustosTab, 300);
+        const debouncedUpdateMapa = debounce(updateMapaTab, 300);
+
+        function resetAllFilters() {
+            document.querySelectorAll('.filters-container, .info-card').forEach(container => {
+                container.querySelectorAll('select').forEach(sel => sel.selectedIndex = 0);
+                container.querySelectorAll('input[type="text"], input[type="date"]').forEach(inp => inp.value = '');
+            });
+            document.querySelectorAll('.time-filters').forEach(group => {
+                group.querySelectorAll('.time-filter-btn').forEach(btn => btn.classList.remove('active'));
+                const defaultBtn = group.querySelector('[data-period="all"]') || group.querySelector('[data-aggregation="daily"]') || group.querySelector('[data-aggregation="monthly"]');
+                if (defaultBtn) defaultBtn.classList.add('active');
+            });
+            selectedObraFilter = null;
+        }
+
+        function addEventListeners() {
+            document.querySelectorAll('.time-filters').forEach(container => {
+                container.addEventListener('click', (event) => {
+                    const button = event.target.closest('.time-filter-btn');
+                    if (!button) return;
+                    
+                    const parentId = container.id;
+                    let type;
+                    if (parentId.startsWith('geral')) type = 'geral';
+                    else if (parentId.startsWith('maquina')) type = 'maquina';
+                    else if (parentId.startsWith('funcionario')) type = 'funcionario';
+                    else if (parentId.startsWith('custo')) type = 'custos';
+                    else if (parentId.startsWith('mapa')) type = 'mapa';
+                    
+                    if (!type) return;
+
+                    if (container.classList.contains('aggregation-filters')) {
+                        currentAggregation[type] = button.dataset.aggregation;
+                    } else {
+                        const typeCapitalized = type.charAt(0).toUpperCase() + type.slice(1);
+                        const dateInputs = [
+                            document.getElementById(`startDate${typeCapitalized}`),
+                            document.getElementById(`endDate${typeCapitalized}`)
+                        ];
+                        dateInputs.forEach(input => { if (input) input.value = ''; });
+                    }
+                    
+                    container.querySelectorAll('.time-filter-btn').forEach(b => b.classList.remove('active'));
+                    button.classList.add('active');
+                    
+                     callUpdateFunction(type);
+                });
+            });
+        
+            ['filterMaquinaGeral', 'filterFuncionarioGeral'].forEach(id => document.getElementById(id)?.addEventListener('change', updateVisaoGeral));
+            ['startDateGeral', 'endDateGeral'].forEach(id => document.getElementById(id)?.addEventListener('change', () => { document.querySelectorAll('#geralTimeFilters .time-filter-btn').forEach(b => b.classList.remove('active')); updateVisaoGeral(); }));
+            
+            document.getElementById('filterMaquina')?.addEventListener('change', updateMaquinaAnalysis);
+            ['startDateMaquina', 'endDateMaquina'].forEach(id => document.getElementById(id)?.addEventListener('change', () => { document.querySelectorAll('#maquinaTimeFilters .time-filter-btn').forEach(b => b.classList.remove('active')); updateMaquinaAnalysis(); }));
+            
+            document.getElementById('filterFuncionario')?.addEventListener('change', updateFuncionarioAnalysis);
+            ['startDateFuncionario', 'endDateFuncionario'].forEach(id => document.getElementById(id)?.addEventListener('change', () => { document.querySelectorAll('#funcionarioTimeFilters .time-filter-btn').forEach(b => b.classList.remove('active')); updateFuncionarioAnalysis(); }));
+            
+            ['filterCustoCategoria', 'filterCustoMaquina', 'filterCustoSubCategoria', 'filterCustoStatus'].forEach(id => {
+                if(document.getElementById(id)) document.getElementById(id).addEventListener('change', debouncedUpdateCustos);
+            });
+            ['startDateCusto', 'endDateCusto'].forEach(id => document.getElementById(id)?.addEventListener('change', () => { document.querySelectorAll('#custoTimeFilters .time-filter-btn').forEach(b => b.classList.remove('active')); debouncedUpdateCustos(); }));
+            
+            document.getElementById('filterMaquinaMapa')?.addEventListener('change', debouncedUpdateMapa);
+            ['startDateMapa', 'endDateMapa'].forEach(id => {
+                document.getElementById(id)?.addEventListener('change', () => { 
+                    document.querySelectorAll('#mapaTimeFilters .time-filter-btn').forEach(b => b.classList.remove('active'));
+                    debouncedUpdateMapa();
+                });
+            });
+            document.getElementById('obraSearchInput')?.addEventListener('keyup', debouncedUpdateMapa);
+            document.getElementById('clearObraFilter')?.addEventListener('click', () => {
+                selectedObraFilter = null;
+                document.getElementById('obraSearchInput').value = '';
+                updateAllTabs();
+            });
+
+            document.querySelectorAll('table.sortable-table thead').forEach(thead => {
+                thead.addEventListener('click', (event) => {
+                    const tableId = thead.closest('table').id;
+                    handleSortClick(event, tableId);
+                });
+            });
+
+            document.getElementById('filterMaquinaCustoStatus')?.addEventListener('change', updateMaquinaAnalysis);
+            document.getElementById('filterMaquinaCustoSubCategoria')?.addEventListener('change', updateMaquinaAnalysis);
+
+            const debouncedUpdateMaquina = debounce(updateMaquinaAnalysis, 300);
+            document.getElementById('custo-viagem')?.addEventListener('input', debouncedUpdateMaquina);
+            document.getElementById('custo-alimentacao')?.addEventListener('input', debouncedUpdateMaquina);
+            document.getElementById('custo-outros')?.addEventListener('input', debouncedUpdateMaquina);
+
+            document.getElementById('controle-obras-grid').addEventListener('click', function(event) {
+                const toggleButton = event.target.closest('.details-toggle-icon');
+                if (toggleButton) {
+                    const card = toggleButton.closest('.obra-progress-card');
+                    const content = card.querySelector('.collapsible-content');
+                    content.classList.toggle('expanded');
+                    toggleButton.classList.toggle('expanded');
+                }
+            });
+        }
+        
+        function handleSortClick(event, tableId) {
+            const sortableState = costSortState[tableId];
+            if (!sortableState) return;
+
+            const header = event.target.closest('.sortable-header');
+            if (!header) return;
+            const column = header.dataset.column;
+            
+            if (sortableState.column === column) {
+                sortableState.direction = sortableState.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortableState.column = column;
+                sortableState.direction = (column === 'custo' || column.toLowerCase().includes('date')) ? 'desc' : 'asc';
+            }
+
+            if(tableId === 'costsTable') updateCustosTab();
+            else if(tableId === 'machineCostsTable') updateMaquinaAnalysis();
+        }
+
+        function updateAllTabs() {
+            updateVisaoGeral();
+            updateMaquinaAnalysis();
+            updateFuncionarioAnalysis();
+            updateCustosTab();
+            updateMapaTab();
+            updateControleObrasTab();
+        }
+
+        // --- LÓGICA DE NAVEGAÇÃO ENTRE ABAS ---
+
+        function switchTab(tabName, element) {
+            stopSlideshow();
+            
+            if (tabName !== 'mapa') {
+                selectedObraFilter = null;
+            }
+
+            document.querySelectorAll('.nav-link').forEach(btn => btn.classList.remove('active'));
+            element.classList.add('active');
+
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            const tabElement = document.getElementById(`tab-${tabName}`);
+            tabElement.classList.add('active');
+            
+            callUpdateFunction(tabName);
+
+            if (tabName === 'apresentacao') updateApresentacaoTab();
+            
+            if(tabName === 'mapa' && map){
+                setTimeout(() => map.invalidateSize(), 10);
+            }
+        }
+
+        function switchSubTab(subTabName, element) {
+            const tabMaquina = document.getElementById('tab-maquina');
+            tabMaquina.querySelectorAll('.sub-tab-button').forEach(btn => btn.classList.remove('active'));
+            tabMaquina.querySelectorAll('.sub-tab-content').forEach(content => content.classList.remove('active'));
+            
+            element.classList.add('active');
+            tabMaquina.querySelector(`#sub-tab-${subTabName}`).classList.add('active');
+            
+            updateMaquinaAnalysis();
+        }
+
+        // --- FUNÇÕES DE PROCESSAMENTO E FILTRAGEM ---
+
+        function getColumnNames(data) {
+            const sample = data.length > 0 ? data[0] : {};
+            const nameMap = {
+                metragem: ['Metragem', 'metragem', 'Total'],
+                operador: ['Operador', 'operador'],
+                aux1: ['Auxiliar 1', 'auxiliar 1'],
+                aux2: ['Auxiliar 2', 'auxiliar 2'],
+                maquina: ['Bate Estaca', 'HCM', 'Equipamento'],
+                obra: ['Obra', 'obra'],
+                data: ['Data', 'data'],
+                secao: ['Seção', 'secao'],
+                controleRelatorio: ['Controle Relatorio', 'Controle Relatório']
+            };
+            const foundNames = {};
+            for (const key in nameMap) {
+                foundNames[key] = nameMap[key].find(name => sample.hasOwnProperty(name)) || key;
+            }
+            return foundNames;
+        }
+
+        function parseDate(dateStr) {
+            if (!dateStr || typeof dateStr !== 'string') return null;
+            if (String(dateStr).match(/^\d{5}$/)) { // Excel serial number
+                const excelEpoch = new Date(1899, 11, 30);
+                return new Date(excelEpoch.getTime() + dateStr * 86400000);
+            }
+            const isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (isoMatch) {
+                const dt = new Date(dateStr);
+                return isNaN(dt.getTime()) ? null : new Date(dt.valueOf() + dt.getTimezoneOffset() * 60000);
+            }
+            const brMatch = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+            if (brMatch) {
+                return new Date(brMatch[3], parseInt(brMatch[2]) - 1, brMatch[1]);
+            }
+            return null;
+        }
+
+        function populateFilters() {
+            const maquinas = [...new Set(productionData.map(item => item[columnNames.maquina] || item.HCM).filter(Boolean))].sort();
+            let todosOsNomes = [];
+            productionData.forEach(item => {
+                if (item[columnNames.operador]) todosOsNomes.push(item[columnNames.operador]);
+                if (item[columnNames.aux1]) todosOsNomes.push(item[columnNames.aux1]);
+                if (item[columnNames.aux2]) todosOsNomes.push(item[columnNames.aux2]);
+            });
+            const funcionarios = [...new Set(todosOsNomes.filter(Boolean))].sort();
+            
+            [document.getElementById('filterMaquina'), document.getElementById('filterMaquinaGeral'), document.getElementById('filterMaquinaMapa')].forEach(select => {
+                if (select) {
+                    select.innerHTML = '<option value="all">Todas as máquinas</option>';
+                    maquinas.forEach(m => select.innerHTML += `<option value="${m}">${m}</option>`);
+                }
+            });
+            
+            [document.getElementById('filterFuncionario'), document.getElementById('filterFuncionarioGeral')].forEach(select => {
+                if (select) {
+                    select.innerHTML = '<option value="all">Todos os funcionários</option>';
+                    funcionarios.forEach(f => select.innerHTML += `<option value="${f}">${f}</option>`);
+                }
+            });
+        }
+        
+        function callUpdateFunction(type) {
+            if (type === 'geral') updateVisaoGeral();
+            else if (type === 'controle') updateControleObrasTab();
+            else if (type === 'maquina') updateMaquinaAnalysis();
+            else if (type === 'funcionario') updateFuncionarioAnalysis();
+            else if (type === 'custos') debouncedUpdateCustos();
+            else if (type === 'mapa') debouncedUpdateMapa();
+            else if (type === 'apresentacao') updateApresentacaoTab();
+        }
+        
+        function filterDataByTime(data, timeFilter, dateField = 'parsedDate') {
+            if (timeFilter === 'all' || !data || data.length === 0) return data;
+            
+            const validDates = data.map(item => item[dateField]).filter(Boolean);
+            if (validDates.length === 0) return [];
+            
+            const latestDate = new Date(Math.max.apply(null, validDates));
+            let cutoffDate = new Date(latestDate);
+            
+            switch (timeFilter) {
+                case '7d': cutoffDate.setDate(latestDate.getDate() - 6); break;
+                case '30d': cutoffDate.setDate(latestDate.getDate() - 29); break;
+                case '3m': cutoffDate.setMonth(latestDate.getMonth() - 3); break;
+                case '1y': cutoffDate.setFullYear(latestDate.getFullYear() - 1); break;
+                default: return data;
+            }
+            cutoffDate.setHours(0, 0, 0, 0);
+
+            return data.filter(item => item[dateField] && item[dateField] >= cutoffDate && item[dateField] <= latestDate);
+        }
+
+        function filterByCustomDateRange(data, startDateStr, endDateStr, dateField = 'parsedDate') {
+            if (!startDateStr && !endDateStr) return data;
+            const startDate = startDateStr ? new Date(startDateStr + 'T00:00:00') : null;
+            const endDate = endDateStr ? new Date(endDateStr + 'T23:59:59') : null;
+            return data.filter(item => {
+                const itemDate = item[dateField];
+                if (!itemDate) return false;
+                if (startDate && itemDate < startDate) return false;
+                if (endDate && itemDate > endDate) return false;
+                return true;
+            });
+        }
+        
+        // --- FUNÇÕES DE FORMATAÇÃO E GRÁFICOS ---
+        
+        function formatCurrency(num) { return (num || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+        function formatNumber(num) { return (num || 0).toLocaleString('pt-BR', {maximumFractionDigits: 1}); }
+        
+        function createDoughnutTooltipCallback(isCurrency = false) {
+            return function(context) {
+                if (context.raw === undefined || context.raw === null) return '';
+                const total = context.chart.getDatasetMeta(0).total || context.dataset.data.reduce((a, b) => a + b, 0);
+                const currentValue = context.raw;
+                const percentage = total > 0 ? (currentValue / total) * 100 : 0;
+                let label = context.label || '';
+                const formattedValue = isCurrency ? formatCurrency(currentValue) : formatNumber(currentValue);
+                return `${label}: ${formattedValue} (${percentage.toFixed(1)}%)`;
+            }
+        }
+
+        function createDonutChart(canvasId, chartKey, data, groupColumn, valueColumn = columnNames.metragem, isCurrency = false) {
+            const groupedData = data.reduce((acc, item) => {
+                const key = item[groupColumn] || (groupColumn === columnNames.maquina ? item.HCM : null) ||'Não informado';
+                const value = parseFloat(item[valueColumn]) || 0;
+                acc[key] = (acc[key] || 0) + value;
+                return acc;
+            }, {});
+            const sortedData = Object.entries(groupedData).sort(([,a],[,b]) => b-a).slice(0, 10);
+            const labels = sortedData.map(item => item[0]);
+            const values = sortedData.map(item => item[1]);
+            
+            let backgroundColors;
+            if (canvasId === 'chartMaquinaGeral') {
+                const blueShades = ['#004a99', '#0066cc', '#3399ff', '#66b3ff', '#99ccff'];
+                const greenShades = ['#28a745', '#218838', '#5cb85c', '#90ee90', '#a3d9a5'];
+                let blueIndex = 0, greenIndex = 0;
+                backgroundColors = labels.map(label => String(label).startsWith('HC') ? greenShades[greenIndex++ % greenShades.length] : blueShades[blueIndex++ % blueShades.length]);
+            } else {
+                 backgroundColors = ['#004a99', '#0066cc', '#3399ff', '#66b3ff', '#99ccff', '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7'];
+            }
+            const canvasEl = document.getElementById(canvasId);
+            if (!canvasEl) return;
+            const ctx = canvasEl.getContext('2d');
+            if (charts[chartKey]) charts[chartKey].destroy();
+            charts[chartKey] = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels: labels, datasets: [{ data: values, backgroundColor: backgroundColors, borderWidth: 2, borderColor: '#fff' }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 15, usePointStyle: true } }, tooltip: { callbacks: { label: createDoughnutTooltipCallback(isCurrency) } } } }
+            });
+        }
+        
+        function createEvolutionChart(canvasId, chartKey, data, aggregation, yAxisLabel, valueField, isCurrency = false) {
+            const canvasEl = document.getElementById(canvasId);
+            if (!canvasEl) return;
+            const ctx = canvasEl.getContext('2d');
+            if (charts[chartKey]) charts[chartKey].destroy();
+
+            const dataToAggregate = data;
+
+            const aggregate = (dataset, aggType, field) => {
+                return dataset.reduce((acc, item) => {
+                    if (item.parsedDate) {
+                        let key;
+                        switch (aggType) {
+                            case 'monthly': key = `${item.parsedDate.getFullYear()}-${String(item.parsedDate.getMonth() + 1).padStart(2, '0')}`; break;
+                            case 'yearly': key = `${item.parsedDate.getFullYear()}`; break;
+                            default: key = item.parsedDate.toISOString().split('T')[0]; break;
+                        }
+                        acc[key] = (acc[key] || 0) + (parseFloat(item[field]) || 0);
+                    }
+                    return acc;
+                }, {});
+            };
+
+            const helicesData = dataToAggregate.filter(item => String(item[columnNames.maquina] || item.HCM).startsWith('HC'));
+            const bateEstacasData = dataToAggregate.filter(item => !String(item[columnNames.maquina] || item.HCM).startsWith('HC'));
+            const aggregatedHelices = aggregate(helicesData, aggregation, valueField);
+            const aggregatedBateEstacas = aggregate(bateEstacasData, aggregation, valueField);
+            const allKeys = [...new Set([...Object.keys(aggregatedHelices), ...Object.keys(aggregatedBateEstacas)])].sort((a, b) => new Date(a) - new Date(b));
+            
+            let chartType, tension, fill;
+            if (aggregation === 'daily') {
+                chartType = 'line';
+                tension = 0.3;
+                fill = true;
+            } else {
+                chartType = 'bar';
+                tension = 0;
+                fill = false;
+            }
+
+            const datasets = [
+                {
+                    label: 'Bate-Estacas',
+                    data: allKeys.map(key => aggregatedBateEstacas[key] || 0),
+                    borderColor: 'rgba(0, 74, 153, 0.8)',
+                    backgroundColor: 'rgba(0, 102, 204, 0.6)',
+                    tension: tension,
+                    fill: fill
+                },
+                {
+                    label: 'Hélices',
+                    data: allKeys.map(key => aggregatedHelices[key] || 0),
+                    borderColor: 'rgba(40, 167, 69, 0.8)',
+                    backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                    tension: tension,
+                    fill: fill
+                }
+            ];
+            
+            let timeUnit = 'day', tooltipFormat = 'dd/MM/yyyy';
+            if (aggregation === 'monthly') { timeUnit = 'month'; tooltipFormat = 'MM/yyyy'; } 
+            else if (aggregation === 'yearly') { timeUnit = 'year'; tooltipFormat = 'yyyy'; }
+            
+            charts[chartKey] = new Chart(ctx, {
+                type: chartType,
+                data: { labels: allKeys, datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { unit: timeUnit, tooltipFormat: tooltipFormat },
+                            grid: { display: false },
+                            stacked: true
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: yAxisLabel },
+                            stacked: true
+                        }
+                    },
+                    plugins: {
+                        legend: { display: true, position: 'top' },
+                        tooltip: { mode: 'index', intersect: false, callbacks: { label: (c) => ` ${c.dataset.label}: ${isCurrency ? formatCurrency(c.parsed.y) : formatNumber(c.parsed.y)}` } }
+                    },
+                    interaction: { mode: 'index', intersect: false }
+                }
+            });
+        }
+        
+        function createSizeChart(canvasId, chartKey, data, sizeColumns, title, colors) {
+            const canvasEl = document.getElementById(canvasId);
+            if (!canvasEl) return;
+            const ctx = canvasEl.getContext('2d');
+            if (charts[chartKey]) charts[chartKey].destroy();
+
+            const totals = sizeColumns.map(size => 
+                data.reduce((sum, item) => sum + (parseFloat(item[size]) || 0), 0)
+            );
+
+            charts[chartKey] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sizeColumns,
+                    datasets: [{
+                        label: 'Metragem Total',
+                        data: totals,
+                        backgroundColor: colors
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: { beginAtZero: true, title: { display: true, text: 'Metros' } },
+                        y: { title: { display: true, text: title } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        // --- FUNÇÕES DE ATUALIZAÇÃO DAS ABAS ---
+
+        function updateVisaoGeral() {
+            if (!document.getElementById('filterMaquinaGeral')) return;
+
+            let filteredProdData = [...productionData];
+            
+            if (selectedObraFilter) {
+                filteredProdData = filteredProdData.filter(p => p[columnNames.obra] === selectedObraFilter);
+            }
+
+            const selectedMaquina = document.getElementById('filterMaquinaGeral').value;
+            const selectedFuncionario = document.getElementById('filterFuncionarioGeral').value;
+            
+            if (selectedMaquina !== 'all') filteredProdData = filteredProdData.filter(item => (item[columnNames.maquina] || item.HCM) === selectedMaquina);
+            if (selectedFuncionario !== 'all') filteredProdData = filteredProdData.filter(item => item[columnNames.operador] === selectedFuncionario || item[columnNames.aux1] === selectedFuncionario || item[columnNames.aux2] === selectedFuncionario);
+            
+            const startDate = document.getElementById('startDateGeral').value;
+            const endDate = document.getElementById('endDateGeral').value;
+            const activePreset = document.querySelector('#geralTimeFilters .time-filter-btn.active');
+            if (startDate || endDate) {
+                filteredProdData = filterByCustomDateRange(filteredProdData, startDate, endDate);
+            } else if (activePreset) { 
+                filteredProdData = filterDataByTime(filteredProdData, activePreset.dataset.period); 
+            }
+            
+            const totalOperacoes = filteredProdData.length;
+            const totalMetragem = filteredProdData.reduce((sum, item) => sum + (parseFloat(item[columnNames.metragem]) || 0), 0);
+            const mediaOperacao = totalOperacoes > 0 ? (totalMetragem / totalOperacoes) : 0;
+            const obrasUnicas = new Set(filteredProdData.map(item => item[columnNames.obra]).filter(Boolean).map(nome => String(nome).trim().toLowerCase())).size;
+            document.getElementById('geral-totalMetragem').textContent = formatNumber(totalMetragem);
+            document.getElementById('geral-totalOperacoes').textContent = totalOperacoes.toLocaleString('pt-BR');
+            document.getElementById('geral-mediaOperacao').textContent = mediaOperacao.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+            document.getElementById('geral-obrasAtivas').textContent = obrasUnicas.toLocaleString('pt-BR');
+            
+            const bateEstacaData = filteredProdData.filter(item => !String(item[columnNames.maquina] || item.HCM).startsWith('HC'));
+            const heliceData = filteredProdData.filter(item => String(item[columnNames.maquina] || item.HCM).startsWith('HC'));
+
+            const totalMetragemBE = bateEstacaData.reduce((sum, item) => sum + (parseFloat(item[columnNames.metragem]) || 0), 0);
+            const totalMetragemHC = heliceData.reduce((sum, item) => sum + (parseFloat(item[columnNames.metragem]) || 0), 0);
+            
+            const totalFaturamentoBE = bateEstacaData.reduce((sum, item) => sum + (item.faturamento || 0), 0);
+            const totalFaturamentoHC = heliceData.reduce((sum, item) => sum + (item.faturamento || 0), 0);
+
+            document.getElementById('geral-totalMetragemBE').textContent = formatNumber(totalMetragemBE);
+            document.getElementById('geral-totalMetragemHC').textContent = formatNumber(totalMetragemHC);
+            document.getElementById('geral-totalFaturamentoBE').textContent = formatCurrency(totalFaturamentoBE);
+            document.getElementById('geral-totalFaturamentoHC').textContent = formatCurrency(totalFaturamentoHC);
+
+            createDonutChart('chartOperadorGeral', 'operadorGeral', filteredProdData, columnNames.operador);
+            createDonutChart('chartMaquinaGeral', 'maquinaGeral', filteredProdData, columnNames.maquina);
+            
+            const aggregation = currentAggregation.geral;
+            createEvolutionChart('chartEvolucaoGeral', 'evolucaoGeral', filteredProdData, aggregation, 'Metragem (m)', 'Metragem');
+            createEvolutionChart('chartEvolucaoFaturamento', 'evolucaoFaturamento', filteredProdData, aggregation, 'Faturamento (R$)', 'faturamento', true);
+
+            createSizeChart('chartBateEstacaPorTamanho', 'bateEstacaPorTamanho', bateEstacaData, bateEstacaSizes, 'Seção', ['#004a99', '#005bb5', '#0066cc', '#3399ff', '#66b3ff', '#99ccff']);
+            createSizeChart('chartHelicePorTamanho', 'helicePorTamanho', heliceData, heliceSizes, 'Diâmetro (cm)', ['#1e7e34', '#218838', '#28a745', '#5cb85c', '#90ee90', '#a3d9a5']);
+        }
+        
+        function updateMaquinaSubCategoryFilter(data) {
+            const subCategoriaSelect = document.getElementById('filterMaquinaCustoSubCategoria');
+            if (!subCategoriaSelect) return;
+            const currentSubCat = subCategoriaSelect.value;
+            const subCategorias = [...new Set(data.map(item => item.sub_categoria).filter(Boolean))].sort();
+            subCategoriaSelect.innerHTML = '<option value="all">Todas</option>';
+            subCategorias.forEach(sc => {
+                const selected = sc === currentSubCat ? 'selected' : '';
+                subCategoriaSelect.innerHTML += `<option value="${sc}" ${selected}>${sc}</option>`;
+            });
+        }
+        
+        function updateMaquinaAnalysis() {
+            if (!document.getElementById('filterMaquina')) return;
+
+            let filteredProductionData = [...productionData];
+            let filteredCostData = [...costData];
+            
+            if (selectedObraFilter) {
+                filteredProductionData = filteredProductionData.filter(p => p[columnNames.obra] === selectedObraFilter);
+            }
+            
+            const selectedMaquina = document.getElementById('filterMaquina').value;
+            const startDate = document.getElementById('startDateMaquina').value;
+            const endDate = document.getElementById('endDateMaquina').value;
+            const activePreset = document.querySelector('#maquinaTimeFilters .time-filter-btn.active');
+            
+            filteredProductionData = filteredProductionData.filter(item => selectedMaquina === 'all' || (item[columnNames.maquina] || item.HCM) === selectedMaquina);
+            
+            filteredCostData = filteredCostData.filter(item => item.main_category === 'Maquinas' && (selectedMaquina === 'all' || item.normalized_category === selectedMaquina));
+            
+            updateMaquinaSubCategoryFilter(filteredCostData);
+
+            const selectedStatus = document.getElementById('filterMaquinaCustoStatus').value;
+            const selectedSubCategoria = document.getElementById('filterMaquinaCustoSubCategoria').value;
+
+            if (selectedStatus !== 'all') {
+                filteredCostData = filteredCostData.filter(item => item.status === selectedStatus);
+            }
+            if (selectedSubCategoria !== 'all') {
+                filteredCostData = filteredCostData.filter(item => item.sub_categoria === selectedSubCategoria);
+            }
+            
+            if (startDate || endDate) {
+                filteredProductionData = filterByCustomDateRange(filteredProductionData, startDate, endDate);
+                filteredCostData = filterByCustomDateRange(filteredCostData, startDate, endDate, 'parsedPaymentDate');
+            } else if (activePreset && activePreset.dataset.period !== 'all') {
+                const activePeriod = activePreset.dataset.period;
+                filteredProductionData = filterDataByTime(filteredProductionData, activePeriod);
+                const productionDates = filteredProductionData.map(d => d.parsedDate).filter(Boolean);
+                if (productionDates.length > 0) {
+                    const start = new Date(Math.min.apply(null, productionDates));
+                    const end = new Date(Math.max.apply(null, productionDates));
+                    filteredCostData = filteredCostData.filter(c => c.parsedPaymentDate && c.parsedPaymentDate >= start && c.parsedPaymentDate <= end);
+                } else {
+                    filteredCostData = [];
+                }
+            }
+
+            updateProdutividadeSubTab(filteredProductionData);
+            updateCustosSubTab(filteredCostData);
+            updateRendaSubTab(filteredProductionData, filteredCostData);
+            updateFontesRendaSubTab(filteredProductionData);
+        }
+
+        function updateProdutividadeSubTab(data) {
+            const { metragem, obra } = columnNames;
+            const producaoTotal = data.reduce((sum, item) => sum + (parseFloat(item[metragem]) || 0), 0);
+            const obrasParticipadas = new Set(data.map(item => item[obra]).filter(Boolean)).size;
+            const diasTrabalhados = new Set(data.filter(item => item.parsedDate).map(item => item.parsedDate.toISOString().split('T')[0])).size;
+            const mediaProducao = diasTrabalhados > 0 ? producaoTotal / diasTrabalhados : 0;
+            document.getElementById('maquina-producaoTotal').textContent = formatNumber(producaoTotal);
+            document.getElementById('maquina-obrasParticipadas').textContent = obrasParticipadas.toLocaleString('pt-BR');
+            document.getElementById('maquina-diasTrabalhados').textContent = diasTrabalhados.toLocaleString('pt-BR');
+            document.getElementById('maquina-mediaProducao').textContent = formatNumber(mediaProducao);
+            
+            if(charts['evolucaoMaquina']) charts['evolucaoMaquina'].destroy();
+            const canvasEl = document.getElementById('chartEvolucaoMaquina');
+            if(!canvasEl) return;
+            const aggregation = currentAggregation.maquina;
+            const aggregatedData = data.reduce((acc, item) => {
+                if (item.parsedDate) {
+                    let key;
+                    switch (aggregation) {
+                        case 'monthly': key = `${item.parsedDate.getFullYear()}-${String(item.parsedDate.getMonth() + 1).padStart(2, '0')}`; break;
+                        case 'yearly': key = `${item.parsedDate.getFullYear()}`; break;
+                        default: key = item.parsedDate.toISOString().split('T')[0]; break;
+                    }
+                    acc[key] = (acc[key] || 0) + (parseFloat(item[columnNames.metragem]) || 0);
+                }
+                return acc;
+            }, {});
+            const sortedEntries = Object.entries(aggregatedData).sort(([dateA], [dateB]) => new Date(dateA) - new Date(dateB));
+            const labels = sortedEntries.map(([date]) => date);
+            const values = sortedEntries.map(([, total]) => total);
+            
+            let chartType = 'line', timeUnit = 'day', tooltipFormat = 'dd/MM/yyyy';
+            if (aggregation === 'monthly') { chartType = 'bar'; timeUnit = 'month'; tooltipFormat = 'MM/yyyy'; } 
+            else if (aggregation === 'yearly') { chartType = 'bar'; timeUnit = 'year'; tooltipFormat = 'yyyy'; }
+            
+            charts['evolucaoMaquina'] = new Chart(canvasEl.getContext('2d'), {
+                type: chartType,
+                data: { labels: labels, datasets: [{ label: 'Metragem (m)', data: values, borderColor: '#004a99', backgroundColor: '#0066cc', fill: true, tension: 0.2 }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: timeUnit, tooltipFormat: tooltipFormat } }, y: { beginAtZero: true, title: { display: true, text: 'Metragem (m)' } } }, plugins: { legend: { display: false } } }
+            });
+        }
+
+        function updateCustosSubTab(data) {
+            const custoTotal = data.reduce((sum, item) => sum + item.custo, 0);
+            const qtdCustos = data.length;
+            const qtdPagos = data.filter(item => item.status === 'Pago').length;
+            const qtdPendentes = qtdCustos - qtdPagos;
+            document.getElementById('maquina-custoTotal').textContent = formatCurrency(custoTotal);
+            document.getElementById('maquina-qtdCustos').textContent = qtdCustos;
+            document.getElementById('maquina-qtdPagos').textContent = qtdPagos;
+            document.getElementById('maquina-qtdPendentes').textContent = qtdPendentes;
+            createCostEvolutionChart('chartEvolucaoCustoMaquina', 'custoEvoMaquina', data, currentAggregation.maquina);
+            sortAndRenderTable(data, 'machineCostsTable');
+            createHorizontalBarChart('chartCustoPorSubCategoriaSub', 'custoPorSubCat', data, 'sub_categoria', 5);
+            createHorizontalBarChart('chartCustoPorDescricaoSub', 'custoPorDesc', data, 'descricao', 5);
+        }
+
+        function createHorizontalBarChart(canvasId, chartKey, data, groupColumn, topN) {
+            const canvasEl = document.getElementById(canvasId);
+            if (!canvasEl) return;
+            const ctx = canvasEl.getContext('2d');
+            if (charts[chartKey]) charts[chartKey].destroy();
+
+            const groupedData = data.reduce((acc, item) => {
+                const key = item[groupColumn] || 'Não informado';
+                acc[key] = (acc[key] || 0) + item.custo;
+                return acc;
+            }, {});
+            
+            const sortedData = Object.entries(groupedData).sort(([,a],[,b]) => b-a).slice(0, topN);
+            const labels = sortedData.map(item => item[0]);
+            const values = sortedData.map(item => item[1]);
+            
+            charts[chartKey] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Custo Total',
+                        data: values,
+                        backgroundColor: '#d9534f'
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                    scales: { x: { beginAtZero: true, title: { display: true, text: 'Custo (R$)' } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+        
+        function updateRendaSubTab(productionData, costData) {
+            const custoViagem = parseFloat(document.getElementById('custo-viagem').value) || 0;
+            const custoAlimentacao = parseFloat(document.getElementById('custo-alimentacao').value) || 0;
+            const custoOutros = parseFloat(document.getElementById('custo-outros').value) || 0;
+            const custosAdicionais = custoViagem + custoAlimentacao + custoOutros;
+
+            const faturamentoTotal = productionData.reduce((sum, item) => sum + item.faturamento, 0);
+            const custoOriginal = costData.filter(c => c.status === 'Pago').reduce((sum, item) => sum + item.custo, 0);
+            
+            const custoTotalFinal = custoOriginal + custosAdicionais;
+
+            const lucroBruto = faturamentoTotal - custoTotalFinal;
+            const margemLucro = faturamentoTotal > 0 ? (lucroBruto / faturamentoTotal) * 100 : 0;
+
+            document.getElementById('renda-faturamentoTotal').textContent = formatCurrency(faturamentoTotal);
+            document.getElementById('renda-custoTotal').textContent = formatCurrency(custoTotalFinal);
+            document.getElementById('renda-lucroBruto').textContent = formatCurrency(lucroBruto);
+            document.getElementById('renda-margemLucro').textContent = `${margemLucro.toFixed(1)}%`;
+            
+            createMachineProfitChart('chartLucratividadeMaquina', 'lucratividadeMaquina', productionData, costData, currentAggregation.maquina);
+        }
+
+        function createMachineProfitChart(canvasId, chartKey, revenueData, costData, aggregation) {
+            const canvasEl = document.getElementById(canvasId);
+            if (!canvasEl) return;
+            const ctx = canvasEl.getContext('2d');
+            if (charts[chartKey]) charts[chartKey].destroy();
+
+            const aggregate = (dataset, aggType, valueField, dateField) => {
+                return dataset.reduce((acc, item) => {
+                    if (item[dateField]) {
+                        let key;
+                        switch (aggType) {
+                            case 'monthly': key = `${item[dateField].getFullYear()}-${String(item[dateField].getMonth() + 1).padStart(2, '0')}`; break;
+                            case 'yearly': key = `${item[dateField].getFullYear()}`; break;
+                            default: key = item[dateField].toISOString().split('T')[0]; break;
+                        }
+                        acc[key] = (acc[key] || 0) + (parseFloat(item[valueField]) || 0);
+                    }
+                    return acc;
+                }, {});
+            };
+
+            const aggregatedRevenue = aggregate(revenueData, aggregation, 'faturamento', 'parsedDate');
+            const aggregatedCost = aggregate(costData.filter(c => c.status === 'Pago'), aggregation, 'custo', 'parsedPaymentDate');
+            
+            const allKeys = [...new Set([...Object.keys(aggregatedRevenue), ...Object.keys(aggregatedCost)])].sort((a, b) => new Date(a) - new Date(b));
+            
+            const revenueValues = allKeys.map(key => aggregatedRevenue[key] || 0);
+            const costValues = allKeys.map(key => aggregatedCost[key] || 0);
+            const profitValues = allKeys.map((key, i) => revenueValues[i] - costValues[i]);
+
+            let timeUnit = 'day', tooltipFormat = 'dd/MM/yyyy';
+            if (aggregation === 'monthly') { timeUnit = 'month'; tooltipFormat = 'MM/yyyy'; } 
+            else if (aggregation === 'yearly') { timeUnit = 'year'; tooltipFormat = 'yyyy'; }
+            
+            charts[chartKey] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: allKeys,
+                    datasets: [
+                        { label: 'Faturamento', data: revenueValues, backgroundColor: 'rgba(40, 167, 69, 0.7)', order: 2 },
+                        { label: 'Custo (Pago)', data: costValues, backgroundColor: 'rgba(217, 83, 79, 0.7)', order: 2 },
+                        { label: 'Lucro', data: profitValues, type: 'line', borderColor: '#004a99', backgroundColor: '#004a99', fill: false, tension: 0.1, order: 1 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { type: 'time', time: { unit: timeUnit, tooltipFormat: tooltipFormat }, grid: { display: false } },
+                        y: { beginAtZero: true, title: { display: true, text: 'Valor (R$)' } }
+                    },
+                    plugins: { legend: { display: true, position: 'top' }, tooltip: { mode: 'index', intersect: false, callbacks: { label: (c) => ` ${c.dataset.label}: ${formatCurrency(c.parsed.y)}` } } }
+                }
+            });
+        }
+        
+        function updateFontesRendaSubTab(data) {
+            const mobilizacao = data.reduce((sum, item) => sum + (parseFloat(item['Mobilização']) || 0), 0);
+            const transporteEquip = data.reduce((sum, item) => sum + (parseFloat(item['Transporte do equipamento']) || parseFloat(item['Transporte Equipamento']) || 0), 0);
+            const transporteAcess = data.reduce((sum, item) => sum + (parseFloat(item['Transporte dos acessórios']) || 0), 0);
+            const taxaTecnica = data.reduce((sum, item) => sum + (parseFloat(item['Taxa tecnica']) || 0), 0);
+            
+            document.getElementById('fontes-mobilizacao').textContent = formatCurrency(mobilizacao);
+            document.getElementById('fontes-transporteEquip').textContent = formatCurrency(transporteEquip);
+            document.getElementById('fontes-transporteAcess').textContent = formatCurrency(transporteAcess);
+            document.getElementById('fontes-taxaTecnica').textContent = formatCurrency(taxaTecnica);
+            
+            const populateDetalhesTable = (tbodyId, sizeData) => {
+                const tbody = document.getElementById(tbodyId);
+                tbody.innerHTML = sizeData.map(item => `<tr><td>${item.size}</td><td>${formatNumber(item.totalMetragem)} m</td><td>${formatCurrency(item.totalFaturamento)}</td></tr>`).join('');
+            };
+            
+            const bateEstacaData = data.filter(item => !String(item[columnNames.maquina] || item.HCM).startsWith('HC'));
+            const heliceData = data.filter(item => String(item[columnNames.maquina] || item.HCM).startsWith('HC'));
+
+            const detalhesBateEstaca = calculateDetalhesBateEstaca(bateEstacaData);
+            const detalhesHelice = calculateDetalhesHelice(heliceData);
+
+            populateDetalhesTable('detalhesBateEstaca', detalhesBateEstaca);
+            populateDetalhesTable('detalhesHelice', detalhesHelice);
+
+            const blueShades = ['#004a99', '#005bb5', '#0066cc', '#3399ff', '#66b3ff', '#99ccff'];
+            const greenShades = ['#1e7e34', '#218838', '#28a745', '#5cb85c', '#90ee90', '#a3d9a5'];
+            createSizeChart('sizeChartBateEstacaSub', 'bateEstacaPorTamanhoSub', bateEstacaData, bateEstacaSizes, 'Seção', blueShades);
+            createSizeChart('sizeChartHeliceSub', 'helicePorTamanhoSub', heliceData, heliceSizes, 'Diâmetro (cm)', greenShades);
+
+        }
+
+        function calculateDetalhesBateEstaca(data) {
+            const results = {};
+            bateEstacaSizes.forEach(size => {
+                results[size] = { totalMetragem: 0, totalFaturamento: 0 };
+            });
+
+            data.forEach(row => {
+                const rpm = parseFloat(row['Renda por metro']) || 0;
+                if(rpm > 0) {
+                    bateEstacaSizes.forEach(size => {
+                        const metragemDaSecao = parseFloat(row[size]) || 0;
+                        if (metragemDaSecao > 0) {
+                            results[size].totalMetragem += metragemDaSecao;
+                            results[size].totalFaturamento += metragemDaSecao * rpm;
+                        }
+                    });
+                }
+            });
+            return Object.entries(results).map(([size, values]) => ({ size, ...values }));
+        }
+        
+        function calculateDetalhesHelice(data) {
+            const results = {};
+            heliceSizes.forEach(size => {
+                results[size] = { totalMetragem: 0, totalFaturamento: 0 };
+            });
+
+            data.forEach(row => {
+                heliceSizes.forEach(size => {
+                    const metragemDaSecao = parseFloat(row[size]) || 0;
+                    if (metragemDaSecao > 0) {
+                        const rpm = parseFloat(row[`Renda por metro ${size}`]) || 0;
+                        results[size].totalMetragem += metragemDaSecao;
+                        results[size].totalFaturamento += metragemDaSecao * rpm;
+                    }
+                });
+            });
+            return Object.entries(results).map(([size, values]) => ({ size, ...values }));
+        }
+
+        function updateFuncionarioAnalysis() {
+            if (!document.getElementById('filterFuncionario')) return;
+
+            let filteredData = [...productionData];
+            if (selectedObraFilter) {
+                filteredData = filteredData.filter(p => p[columnNames.obra] === selectedObraFilter);
+            }
+
+            const selectedFuncionario = document.getElementById('filterFuncionario').value;
+            let dataForCommission = [...productionData];
+
+            if (selectedFuncionario !== 'all') {
+                filteredData = filteredData.filter(item => 
+                    item[columnNames.operador] === selectedFuncionario || 
+                    item[columnNames.aux1] === selectedFuncionario || 
+                    item[columnNames.aux2] === selectedFuncionario
+                );
+                dataForCommission = productionData.filter(item => 
+                    item[columnNames.operador] === selectedFuncionario || 
+                    item[columnNames.aux1] === selectedFuncionario || 
+                    item[columnNames.aux2] === selectedFuncionario
+                );
+            }
+            
+            const startDate = document.getElementById('startDateFuncionario').value;
+            const endDate = document.getElementById('endDateFuncionario').value;
+            const activePreset = document.querySelector('#funcionarioTimeFilters .time-filter-btn.active');
+            if (startDate || endDate) {
+                filteredData = filterByCustomDateRange(filteredData, startDate, endDate);
+            } else if (activePreset) { 
+                filteredData = filterDataByTime(filteredData, activePreset.dataset.period); 
+            }
+
+            let totalComissao = 0;
+            if(selectedFuncionario !== 'all') {
+                dataForCommission.forEach(item => {
+                    let metragemComissionavel = 0;
+                    allSizeColumns.forEach(size => {
+                        metragemComissionavel += (parseFloat(item[size]) || 0);
+                    });
+                    
+                    if (item[columnNames.operador] === selectedFuncionario) {
+                        totalComissao += metragemComissionavel * (parseFloat(item['Comissão Operador']) || 0);
+                    }
+                    if (item[columnNames.aux1] === selectedFuncionario) {
+                        totalComissao += metragemComissionavel * (parseFloat(item['Comissão Auxiliar']) || 0);
+                    }
+                    if (item[columnNames.aux2] === selectedFuncionario) {
+                        totalComissao += metragemComissionavel * (parseFloat(item['Comissão Auxiliar']) || 0);
+                    }
+                });
+            }
+
+
+            const producaoTotal = filteredData.reduce((sum, item) => sum + (parseFloat(item[columnNames.metragem]) || 0), 0);
+            const obrasParticipadas = new Set(filteredData.map(item => item[columnNames.obra]).filter(Boolean).map(nome => String(nome).trim().toLowerCase())).size;
+            const diasTrabalhados = new Set(filteredData.filter(item => item.parsedDate).map(item => item.parsedDate.toISOString().split('T')[0])).size;
+            
+            document.getElementById('funcionario-producaoTotal').textContent = formatNumber(producaoTotal);
+            document.getElementById('funcionario-obrasParticipadas').textContent = obrasParticipadas.toLocaleString('pt-BR');
+            document.getElementById('funcionario-diasTrabalhados').textContent = diasTrabalhados.toLocaleString('pt-BR');
+            document.getElementById('funcionario-comissao').textContent = formatCurrency(totalComissao);
+            
+            if(charts['evolucaoFuncionario']) charts['evolucaoFuncionario'].destroy();
+            const canvasEl = document.getElementById('chartEvolucaoFuncionario');
+            const aggregation = currentAggregation.funcionario;
+            const aggregatedData = filteredData.reduce((acc, item) => {
+                if (item.parsedDate) {
+                    let key;
+                    switch (aggregation) {
+                        case 'monthly': key = `${item.parsedDate.getFullYear()}-${String(item.parsedDate.getMonth() + 1).padStart(2, '0')}`; break;
+                        case 'yearly': key = `${item.parsedDate.getFullYear()}`; break;
+                        default: key = item.parsedDate.toISOString().split('T')[0]; break;
+                    }
+                    acc[key] = (acc[key] || 0) + (parseFloat(item[columnNames.metragem]) || 0);
+                }
+                return acc;
+            }, {});
+            const sortedEntries = Object.entries(aggregatedData).sort(([dateA], [dateB]) => new Date(dateA) - new Date(dateB));
+            const labels = sortedEntries.map(([date]) => date);
+            const values = sortedEntries.map(([, total]) => total);
+            
+            let chartType = 'line', timeUnit = 'day', tooltipFormat = 'dd/MM/yyyy';
+            if (aggregation === 'monthly') { chartType = 'bar'; timeUnit = 'month'; tooltipFormat = 'MM/yyyy'; } 
+            else if (aggregation === 'yearly') { chartType = 'bar'; timeUnit = 'year'; tooltipFormat = 'yyyy'; }
+            
+            charts['evolucaoFuncionario'] = new Chart(canvasEl.getContext('2d'), {
+                type: chartType,
+                data: { labels: labels, datasets: [{ label: 'Metragem (m)', data: values, borderColor: '#004a99', backgroundColor: '#0066cc', fill: true, tension: 0.2 }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: timeUnit, tooltipFormat: tooltipFormat } }, y: { beginAtZero: true, title: { display: true, text: 'Metragem (m)' } } }, plugins: { legend: { display: false } } }
+            });
+
+        }
+
+        function initMap() {
+            if (!map && document.getElementById('map')) {
+                map = L.map('map').setView([-26.3044, -48.8456], 12); 
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(map);
+                markersGroup = L.markerClusterGroup().addTo(map);
+            }
+        }
+        
+        function updateMapaTab() {
+            if (!document.getElementById('map')) return;
+
+            initMap();
+            const { metragem, obra, maquina } = columnNames;
+            
+            let mapFilteredData = [...productionData];
+
+            const selectedMaquina = document.getElementById('filterMaquinaMapa').value;
+            const searchTerm = document.getElementById('obraSearchInput').value.toLowerCase();
+            
+            if (selectedMaquina !== 'all') mapFilteredData = mapFilteredData.filter(item => (item[maquina] || item.HCM) === selectedMaquina);
+
+            const startDate = document.getElementById('startDateMapa').value;
+            const endDate = document.getElementById('endDateMapa').value;
+            const activePreset = document.querySelector('#mapaTimeFilters .time-filter-btn.active');
+            if (startDate || endDate) {
+                mapFilteredData = filterByCustomDateRange(mapFilteredData, startDate, endDate);
+            } else if (activePreset) { 
+                mapFilteredData = filterDataByTime(mapFilteredData, activePreset.dataset.period); 
+            }
+
+            if (searchTerm) {
+                mapFilteredData = mapFilteredData.filter(item => item[obra] && item[obra].toLowerCase().includes(searchTerm));
+            }
+            
+            const obrasAgrupadas = mapFilteredData.reduce((acc, item) => {
+                const obraNome = item[obra];
+                const lat = parseFloat(item['Latitude']);
+                const lon = parseFloat(item['Longitude']);
+
+                if (!obraNome || !item.parsedDate || isNaN(lat) || isNaN(lon)) return acc;
+                
+                if (!acc[obraNome]) {
+                    acc[obraNome] = {
+                        nome: obraNome, metragemTotal: 0, faturamentoTotal: 0,
+                        datas: [], registros: 0, lat: lat, lon: lon, marker: null
+                    };
+                }
+                
+                acc[obraNome].metragemTotal += (parseFloat(item[metragem]) || 0);
+                acc[obraNome].faturamentoTotal += item.faturamento;
+                acc[obraNome].datas.push(item.parsedDate);
+                acc[obraNome].registros++;
+                
+                return acc;
+            }, {});
+
+            const obraListContainer = document.getElementById('obra-list-container');
+            obraListContainer.innerHTML = '';
+            
+            if(markersGroup) markersGroup.clearLayers();
+
+            const obraValues = Object.values(obrasAgrupadas);
+            let bounds = [];
+
+            const collator = new Intl.Collator('pt-BR', { sensitivity: 'base' });
+            obraValues.sort((a, b) => collator.compare(a.nome, b.nome)).forEach(obraData => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'obra-list-item';
+                itemDiv.textContent = obraData.nome;
+                
+                const marker = L.marker([obraData.lat, obraData.lon]);
+                marker.bindPopup(`<b>${obraData.nome}</b><br>Clique para filtrar o dashboard.`);
+                obraData.marker = marker;
+                
+                const filterAction = () => {
+                    selectedObraFilter = obraData.nome;
+                    updateAllTabs(); 
+                };
+                
+                itemDiv.onclick = filterAction;
+                marker.on('click', filterAction);
+                
+                markersGroup.addLayer(marker);
+                bounds.push([obraData.lat, obraData.lon]);
+                obraListContainer.appendChild(itemDiv);
+            });
+            
+            if (bounds.length > 0 && !selectedObraFilter) {
+                 map.fitBounds(bounds, { padding: [50, 50] });
+            }
+
+            if(selectedObraFilter) {
+                const activeObraData = obraValues.find(o => o.nome === selectedObraFilter);
+                if (activeObraData) {
+                    const activeItem = Array.from(obraListContainer.children).find(child => child.textContent === selectedObraFilter);
+                    if (activeItem) {
+                        activeItem.classList.add('active');
+                    }
+                    map.setView([activeObraData.lat, activeObraData.lon], 15);
+                    activeObraData.marker.openPopup();
+                }
+                 updateMapaKPIs();
+            } else if (obraValues.length > 0) {
+                 updateMapaKPIs(obraValues[0]);
+            } else {
+                 updateMapaKPIs(null);
+            }
+        }
+        
+        function updateMapaKPIs(obraData) {
+            let dataParaKPIs = [];
+            
+            let obraFiltrada = selectedObraFilter || (obraData ? obraData.nome : null);
+
+            if(obraFiltrada) {
+                dataParaKPIs = productionData.filter(p => p[columnNames.obra] === obraFiltrada);
+            } else {
+                 document.getElementById('mapa-totalMetragem').textContent = '-';
+                 document.getElementById('mapa-duracao').textContent = '-';
+                 document.getElementById('mapa-faturamento').textContent = '-';
+                 document.getElementById('mapa-equipamentos').textContent = '-';
+                 document.getElementById('mapa-mediaDiaria').textContent = '-';
+                 return;
+            }
+
+            const metragemTotal = dataParaKPIs.reduce((sum, item) => sum + (parseFloat(item[columnNames.metragem]) || 0), 0);
+            const faturamentoTotal = dataParaKPIs.reduce((sum, item) => sum + (item.faturamento || 0), 0);
+            const datas = dataParaKPIs.map(d => d.parsedDate).filter(Boolean);
+            const equipamentos = [...new Set(dataParaKPIs.map(item => item[columnNames.maquina] || item.HCM))].join(', ');
+            let diasTrabalhados = 0;
+
+            if(datas.length > 0) {
+                const minDate = new Date(Math.min.apply(null, datas));
+                const maxDate = new Date(Math.max.apply(null, datas));
+                const duracao = Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)) + 1;
+                diasTrabalhados = new Set(datas.map(d => d.toISOString().split('T')[0])).size;
+                
+                document.getElementById('mapa-duracao').textContent = `${duracao} (${diasTrabalhados} trabalhados)`;
+            } else {
+                document.getElementById('mapa-duracao').textContent = '-';
+            }
+            
+            const mediaDiaria = diasTrabalhados > 0 ? (metragemTotal / diasTrabalhados) : 0;
+            document.getElementById('mapa-mediaDiaria').textContent = formatNumber(mediaDiaria);
+            
+            document.getElementById('mapa-totalMetragem').textContent = formatNumber(metragemTotal);
+            document.getElementById('mapa-faturamento').textContent = formatCurrency(faturamentoTotal);
+            document.getElementById('mapa-equipamentos').textContent = equipamentos || '-';
+        }
+
+        function updateCustosTab() {
+            if (!document.getElementById('filterCustoCategoria')) return;
+
+            let filteredCosts = [...costData];
+            const cat = document.getElementById('filterCustoCategoria').value;
+            const maq = document.getElementById('filterCustoMaquina').value;
+            const status = document.getElementById('filterCustoStatus').value;
+            const startDate = document.getElementById('startDateCusto').value;
+            const endDate = document.getElementById('endDateCusto').value;
+            const activePreset = document.querySelector('#custoTimeFilters .time-filter-btn.active');
+
+            document.getElementById('maquinaCustoFilterGroup').style.display = cat === 'Maquinas' ? 'flex' : 'none';
+            
+            if (cat !== 'all') {
+                filteredCosts = filteredCosts.filter(item => item.main_category === cat);
+                if (cat === 'Maquinas' && maq !== 'all') {
+                    filteredCosts = filteredCosts.filter(item => item.normalized_category === maq);
+                }
+            }
+            updateSubCategoryFilter(filteredCosts);
+            const subCat = document.getElementById('filterCustoSubCategoria').value;
+            if (subCat !== 'all') filteredCosts = filteredCosts.filter(item => item.sub_categoria === subCat);
+            if (status !== 'all') filteredCosts = filteredCosts.filter(item => item.status === status);
+            
+            if (startDate || endDate) {
+                filteredCosts = filterByCustomDateRange(filteredCosts, startDate, endDate, 'parsedPaymentDate');
+            } else if (activePreset) { 
+                filteredCosts = filterDataByTime(filteredCosts, activePreset.dataset.period, 'parsedPaymentDate'); 
+            }
+            
+            const totalPago = filteredCosts.filter(c => c.status === 'Pago').reduce((sum, item) => sum + item.custo, 0);
+            const totalPendente = filteredCosts.filter(c => c.status !== 'Pago').reduce((sum, item) => sum + item.custo, 0);
+            
+            document.getElementById('custos-total').textContent = formatCurrency(totalPago);
+            document.getElementById('custos-pendente').textContent = formatCurrency(totalPendente);
+            
+            createCostDonutChart('chartCustoPorCategoria', 'custoCat', filteredCosts.filter(c=>c.custo > 0), 'main_category');
+            createCostDonutChart('chartCustoPorSubCategoria', 'custoSubCat', filteredCosts.filter(c=>c.custo > 0), 'sub_categoria');
+            createCostEvolutionChart('chartEvolucaoCustos', 'custoEvo', filteredCosts, currentAggregation.custos);
+            sortAndRenderTable(filteredCosts, 'costsTable');
+        }
+        
+        function sortAndRenderTable(data, tableId) {
+            const sortConfig = costSortState[tableId];
+            if (!sortConfig) return; 
+            const sortedData = [...data];
+            sortCostData(sortedData, sortConfig.column, sortConfig.direction);
+            const tbodyId = tableId + 'Body';
+            const searchId = tableId.replace('Table', 'SearchInput');
+            renderDetailedCostsTable(sortedData, tableId, tbodyId, searchId);
+        }
+        
+        function sortCostData(data, sortColumn, sortDirection) {
+            const collator = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
+            data.sort((a, b) => {
+                let valA = a[sortColumn];
+                let valB = b[sortColumn];
+
+                if (sortColumn.toLowerCase().includes('date')) {
+                    valA = valA instanceof Date ? valA.getTime() : 0;
+                    valB = valB instanceof Date ? valB.getTime() : 0;
+                }
+                
+                if (typeof valA !== 'number' || typeof valB !== 'number') {
+                    valA = String(valA || '').toLowerCase();
+                    valB = String(valB || '').toLowerCase();
+                }
+                
+                let comparison = (typeof valA === 'number' && typeof valB !== 'number') ? valA - valB : collator.compare(valA, valB);
+                return sortDirection === 'asc' ? comparison : -comparison;
+            });
+        }
+
+
+        function createCostDonutChart(canvasId, chartKey, data, groupColumn) {
+             const canvasEl = document.getElementById(canvasId);
+             if (!canvasEl) return;
+             const ctx = canvasEl.getContext('2d');
+             if (charts[chartKey]) charts[chartKey].destroy();
+
+            const groupedData = data.reduce((acc, item) => {
+                const key = item[groupColumn] || 'Não informado';
+                acc[key] = (acc[key] || 0) + item.custo;
+                return acc;
+            }, {});
+            const sortedData = Object.entries(groupedData).sort(([,a],[,b]) => b-a).slice(0, 10);
+            const labels = sortedData.map(item => item[0]);
+            const values = sortedData.map(item => item[1]);
+            
+            charts[chartKey] = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels: labels, datasets: [{ data: values, backgroundColor: ['#d9534f', '#f0ad4e', '#5cb85c', '#0275d8', '#5bc0de', '#292b2c', '#d9534f', '#f0ad4e', '#5cb85c', '#0275d8'], borderWidth: 2, borderColor: '#fff' }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 15, usePointStyle: true } }, tooltip: { callbacks: { label: createDoughnutTooltipCallback(true) } } } }
+            });
+        }
+        
+        function createCostEvolutionChart(canvasId, chartKey, data, aggregation) {
+            const canvasEl = document.getElementById(canvasId);
+            if (!canvasEl) return;
+            const ctx = canvasEl.getContext('2d');
+            if (charts[chartKey]) charts[chartKey].destroy();
+
+            const dataPagos = data.filter(item => item.status === 'Pago' && item.parsedPaymentDate);
+            let chartType = 'bar', timeUnit = 'month', tooltipFormat = 'MM/yyyy';
+            if (aggregation === 'daily') { chartType = 'line'; timeUnit = 'day'; tooltipFormat = 'dd/MM/yyyy'; }
+            else if (aggregation === 'yearly') { chartType = 'bar'; timeUnit = 'year'; tooltipFormat = 'yyyy'; }
+            
+            const aggregatedData = dataPagos.reduce((acc, item) => {
+                let key;
+                switch (aggregation) {
+                    case 'yearly': key = `${item.parsedPaymentDate.getFullYear()}`; break;
+                    case 'daily': key = item.parsedPaymentDate.toISOString().split('T')[0]; break;
+                    default: key = `${item.parsedPaymentDate.getFullYear()}-${String(item.parsedPaymentDate.getMonth() + 1).padStart(2, '0')}`; break;
+                }
+                acc[key] = (acc[key] || 0) + item.custo;
+                return acc;
+            }, {});
+            const sortedEntries = Object.entries(aggregatedData).sort(([dateA], [dateB]) => new Date(dateA) - new Date(dateB));
+            const labels = sortedEntries.map(([date]) => date);
+            const values = sortedEntries.map(([, total]) => total);
+            
+            charts[chartKey] = new Chart(ctx, {
+                type: chartType,
+                data: { labels: labels, datasets: [{ label: 'Custo Mensal', data: values, backgroundColor: '#d9534f', borderColor: '#d9534f', fill: aggregation === 'daily', tension: 0.2 }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: timeUnit, tooltipFormat: tooltipFormat } }, y: { beginAtZero: true, title: { display: true, text: 'Custo (R$)' } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` Custo: ${formatCurrency(c.parsed.y)}` } } } }
+            });
+        }
+        
+        function renderDetailedCostsTable(data, tableId, tbodyId, searchId) {
+            const tableBody = document.getElementById(tbodyId);
+            if (!tableBody) return;
+            const sortConfig = costSortState[tableId] || { column: 'parsedPaymentDate', direction: 'desc' };
+            document.querySelectorAll(`#${tableId} .sortable-header`).forEach(header => {
+                header.classList.remove('sorted-asc', 'sorted-desc');
+                if(header.dataset.column === sortConfig.column) header.classList.add(`sorted-${sortConfig.direction}`);
+            });
+            const formatShortDate = (date) => date ? new Date(date).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '-';
+
+            if (tableId === 'costsTable') {
+                 tableBody.innerHTML = data.map(item => `<tr><td>${item.descricao || '-'}</td><td>${item.main_category || '-'}</td><td>${item.sub_categoria || '-'}</td><td>${formatShortDate(item.parsedPaymentDate)}</td><td class="status-${(item.status || 'previsto').toLowerCase().replace(/\s+/g, '')}">${item.status || '-'}</td><td style="text-align: right;">${formatCurrency(item.custo)}</td></tr>`).join('');
+            } else { // machineCostsTable
+                 tableBody.innerHTML = data.map(item => `<tr><td>${item.descricao || '-'}</td><td>${item.normalized_category || '-'}</td><td>${item.sub_categoria || '-'}</td><td>${formatShortDate(item.parsedPaymentDate)}</td><td class="status-${(item.status || 'previsto').toLowerCase().replace(/\s+/g, '')}">${item.status || '-'}</td><td style="text-align: right;">${formatCurrency(item.custo)}</td></tr>`).join('');
+            }
+        }
+        
+        function updateApresentacaoTab(){
+            if (!document.getElementById('apresentacao-metragemHelices')) return;
+
+            const { metragem, obra, maquina } = columnNames;
+            const data30dias = filterDataByTime(productionData, '30d');
+            const helicesData = data30dias.filter(item => String(item[maquina] || item.HCM).startsWith('HC'));
+            const bateEstacasData = data30dias.filter(item => !String(item[maquina] || item.HCM).startsWith('HC'));
+            const totalMetragemHelices = helicesData.reduce((sum, item) => sum + (parseFloat(item[metragem]) || 0), 0);
+            const totalOperacoesHelices = helicesData.length;
+            const mediaOperacaoHelices = totalOperacoesHelices > 0 ? (totalMetragemHelices / totalOperacoesHelices) : 0;
+            const obrasUnicasHelices = new Set(helicesData.map(item => item[obra]).filter(Boolean)).size;
+            const totalMetragemBateEstacas = bateEstacasData.reduce((sum, item) => sum + (parseFloat(item[metragem]) || 0), 0);
+            const totalOperacoesBateEstacas = bateEstacasData.length;
+            const mediaOperacaoBateEstacas = totalOperacoesBateEstacas > 0 ? (totalMetragemBateEstacas / totalOperacoesBateEstacas) : 0;
+            const obrasUnicasBateEstacas = new Set(bateEstacasData.map(item => item[obra]).filter(Boolean)).size;
+            document.getElementById('apresentacao-metragemHelices').textContent = formatNumber(totalMetragemHelices);
+            document.getElementById('apresentacao-operacoesHelices').textContent = totalOperacoesHelices.toLocaleString('pt-BR');
+            document.getElementById('apresentacao-mediaHelices').textContent = formatNumber(mediaOperacaoHelices);
+            document.getElementById('apresentacao-obrasHelices').textContent = obrasUnicasHelices.toLocaleString('pt-BR');
+            document.getElementById('apresentacao-metragemBateEstacas').textContent = formatNumber(totalMetragemBateEstacas);
+            document.getElementById('apresentacao-operacoesBateEstacas').textContent = totalOperacoesBateEstacas.toLocaleString('pt-BR');
+            document.getElementById('apresentacao-mediaBateEstacas').textContent = formatNumber(mediaOperacaoBateEstacas);
+            document.getElementById('apresentacao-obrasBateEstacas').textContent = obrasUnicasBateEstacas.toLocaleString('pt-BR');
+            const data12meses = filterDataByTime(productionData, '1y');
+            createEvolutionChart('chartEvolucaoApresentacao', 'evolucaoApresentacao', data12meses, 'monthly', 'Metragem (m)', columnNames.metragem);
+            startSlideshow(data30dias);
+        }
+
+        function startSlideshow(data30dias) {
+            stopSlideshow(); 
+            slideshowMachines = [...new Set(data30dias.map(item => item[columnNames.maquina] || item.HCM).filter(Boolean))].sort();
+            currentSlideIndex = 0;
+            if(slideshowMachines.length > 0) {
+                showNextSlide(); 
+                slideshowInterval = setInterval(showNextSlide, 20000);
+            } else {
+                document.getElementById('slide-machine-name').textContent = "Sem dados nos últimos 30 dias";
+                document.getElementById('slide-producao').textContent = "-";
+                document.getElementById('slide-dias').textContent = "-";
+                document.getElementById('slide-media').textContent = "-";
+            }
+        }
+
+        function stopSlideshow() {
+            clearInterval(slideshowInterval);
+            slideshowInterval = null;
+        }
+
+        function showNextSlide() {
+            if (slideshowMachines.length === 0) return;
+            const card = document.getElementById('presentation-card');
+            card.classList.add('faded-out');
+            setTimeout(() => {
+                const machineName = slideshowMachines[currentSlideIndex];
+                const data30dias = filterDataByTime(productionData, '30d');
+                const machineData30d = data30dias.filter(item => (item[columnNames.maquina] || item.HCM) === machineName);
+                const { metragem } = columnNames;
+                const producaoTotal = machineData30d.reduce((sum, item) => sum + (parseFloat(item[metragem]) || 0), 0);
+                const diasTrabalhados = new Set(machineData30d.map(item => item.parsedDate.toISOString().split('T')[0])).size;
+                const mediaProducao = diasTrabalhados > 0 ? producaoTotal / diasTrabalhados : 0;
+                document.getElementById('slide-machine-name').textContent = machineName;
+                document.getElementById('slide-producao').textContent = formatNumber(producaoTotal);
+                document.getElementById('slide-dias').textContent = diasTrabalhados.toLocaleString('pt-BR');
+                document.getElementById('slide-media').textContent = formatNumber(mediaProducao);
+                currentSlideIndex = (currentSlideIndex + 1) % slideshowMachines.length;
+                card.classList.remove('faded-out');
+            }, 600);
+        }
+
+        function setupCostFilters() {
+            const maquinaSelect = document.getElementById('filterCustoMaquina');
+            if (!maquinaSelect) return;
+            const maquinas = [...new Set(costData.filter(item => item.main_category === 'Maquinas').map(item => item.normalized_category))].sort();
+            maquinaSelect.innerHTML = '<option value="all">Todas as máquinas</option>';
+            maquinas.forEach(m => maquinaSelect.innerHTML += `<option value="${m}">${m}</option>`);
+            
+            document.getElementById('filterCustoCategoria')?.addEventListener('change', debouncedUpdateCustos);
+            
+            document.getElementById('costsSearchInput')?.addEventListener('keyup', debounce((e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                document.querySelectorAll('#costsTableBody tr').forEach(row => {
+                    row.style.display = row.cells[0].textContent.toLowerCase().includes(searchTerm) ? '' : 'none';
+                });
+            }, 300));
+             document.getElementById('machineCostsSearchInput')?.addEventListener('keyup', debounce((e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                document.querySelectorAll('#machineCostsTableBody tr').forEach(row => {
+                    row.style.display = row.cells[0].textContent.toLowerCase().includes(searchTerm) ? '' : 'none';
+                });
+            }, 300));
+        }
+
+        function updateSubCategoryFilter(data) {
+            const subCategoriaSelect = document.getElementById('filterCustoSubCategoria');
+            if (!subCategoriaSelect) return;
+            const currentSubCat = subCategoriaSelect.value;
+            const subCategorias = [...new Set(data.map(item => item.sub_categoria).filter(Boolean))].sort();
+            subCategoriaSelect.innerHTML = '<option value="all">Todas</option>';
+            subCategorias.forEach(sc => {
+                const selected = sc === currentSubCat ? 'selected' : '';
+                subCategoriaSelect.innerHTML += `<option value="${sc}" ${selected}>${sc}</option>`;
+            });
+        }
+
+        function updateControleObrasTab() {
+            const container = document.getElementById('controle-obras-grid');
+            if (!container || !allObrasData) return;
+
+            container.innerHTML = '';
+            let hasOngoingWorks = false;
+
+            for (const nomeObra in allObrasData) {
+                const obra = allObrasData[nomeObra];
+                if (!obra.informacoes_gerais || !obra.detalhes_estacas) continue;
+
+                const status = obra.informacoes_gerais.Status || '';
+
+                if (status.toLowerCase().trim() === 'em andamento') {
+                    hasOngoingWorks = true;
+                    
+                    const estacasComRelatorio = obra.detalhes_estacas.filter(p => p['Controle Relatorio'] && parseDate(p['Data']));
+                    const totalPiles = obra.detalhes_estacas.length;
+                    const drivenPiles = estacasComRelatorio.filter(p => String(p['Controle Relatorio']).toLowerCase().trim() === 'cravada').length;
+                    const remainingPiles = totalPiles - drivenPiles;
+                    const percentage = totalPiles > 0 ? (drivenPiles / totalPiles) * 100 : 0;
+                    
+                    const latRaw = parseFloat(obra.informacoes_gerais.Latitude);
+                    const lonRaw = parseFloat(obra.informacoes_gerais.Longitude);
+                    const lat = !isNaN(latRaw) ? latRaw.toFixed(6) : 'N/A';
+                    const lon = !isNaN(lonRaw) ? lonRaw.toFixed(6) : 'N/A';
+
+                    // --- Cálculo da Média dos Últimos 3 Dias ---
+                    const sortedReports = estacasComRelatorio.sort((a,b) => parseDate(b.Data) - parseDate(a.Data));
+                    const uniqueWorkDays = [...new Set(sortedReports.map(p => parseDate(p.Data).toISOString().split('T')[0]))];
+                    const lastThreeDays = uniqueWorkDays.slice(0, 3);
+                    
+                    let pilesInLastThreeDays = 0;
+                    if (lastThreeDays.length > 0) {
+                        pilesInLastThreeDays = sortedReports.filter(p => lastThreeDays.includes(parseDate(p.Data).toISOString().split('T')[0])).length;
+                    }
+                    
+                    const dailyAverageLast3Days = lastThreeDays.length > 0 ? (pilesInLastThreeDays / lastThreeDays.length) : 0;
+                    const daysRemaining = dailyAverageLast3Days > 0 ? Math.ceil(remainingPiles / dailyAverageLast3Days) : 'N/A';
+                    const previsaoHtml = `<span class="previsao-termino">Previsão de Término: ${daysRemaining} dias</span>`;
+
+
+                    const progressBySection = estacasComRelatorio.reduce((acc, p) => {
+                        const secao = p['Seção'];
+                        if (secao) {
+                            if (!acc[secao]) acc[secao] = { planned: 0, executed: 0 };
+                            acc[secao].executed++;
+                        }
+                        return acc;
+                    }, {});
+
+                    obra.detalhes_estacas.forEach(p => {
+                        const secao = p['Seção'];
+                        if (secao) {
+                            if (!progressBySection[secao]) progressBySection[secao] = { planned: 0, executed: 0 };
+                            progressBySection[secao].planned++;
+                        }
+                    });
+
+                    let detailsHtml = Object.entries(progressBySection).map(([sectionName, data]) => `
+                        <div class="section-progress-item">
+                            <span class="section-name">Seção ${sectionName}:</span>
+                            <span class="section-counts">${data.executed} de ${data.planned} Cravadas</span>
+                        </div>
+                    `).join('');
+
+                    const equipamentosData = estacasComRelatorio.reduce((acc, p) => {
+                        const equipName = p['Equipamento'];
+                        if (!equipName) return acc;
+
+                        if (!acc[equipName]) {
+                            acc[equipName] = {
+                                producaoTotal: 0,
+                                diasTrabalhados: new Set(),
+                                estacasCount: 0,
+                                operadores: new Set(),
+                                auxiliares: new Set(),
+                                ultimaData: null,
+                            };
+                        }
+                        const data = acc[equipName];
+                        const parsedDate = parseDate(p['Data']);
+
+                        data.producaoTotal += parseFloat(p['Total']) || 0;
+                        data.estacasCount++;
+
+                        if(parsedDate) {
+                            data.diasTrabalhados.add(parsedDate.toISOString().split('T')[0]);
+                            if (!data.ultimaData || parsedDate > data.ultimaData) {
+                                data.ultimaData = parsedDate;
+                            }
+                        }
+                        if (p['Operador']) data.operadores.add(p['Operador']);
+                        if (p['Auxiliar 1']) data.auxiliares.add(p['Auxiliar 1']);
+                        if (p['Auxiliar 2']) data.auxiliares.add(p['Auxiliar 2']);
+                        
+                        return acc;
+                    }, {});
+
+                    let equipamentosListHtml = Object.entries(equipamentosData).map(([equipName, data]) => `
+                        <div class="equipamento-item">
+                            <span class="equipamento-name">${equipName}:</span>
+                            <span class="equipamento-info">
+                                <b>Op:</b> ${[...data.operadores].join(', ') || 'N/A'} | 
+                                <b>Aux:</b> ${[...data.auxiliares].join(', ') || 'N/A'} | 
+                                <b>Último dia:</b> ${data.ultimaData ? data.ultimaData.toLocaleDateString('pt-BR') : 'N/A'}
+                            </span>
+                        </div>
+                    `).join('');
+
+                    let collapsibleContentHtml = Object.entries(equipamentosData).map(([equipName, data]) => {
+                        const diasTrabalhados = data.diasTrabalhados.size;
+                        const mediaProducao = diasTrabalhados > 0 ? data.producaoTotal / diasTrabalhados : 0;
+                        const mediaEstacasDia = diasTrabalhados > 0 ? data.estacasCount / diasTrabalhados : 0;
+                        return `
+                            <div class="equipamento-kpi-card">
+                                <h4>${equipName}</h4>
+                                <div class="equipamento-details-grid">
+                                    <div>
+                                        <div class="kpi-value small">${formatNumber(data.producaoTotal)}</div>
+                                        <div class="kpi-unit">Prod. Total (m)</div>
+                                    </div>
+                                    <div>
+                                        <div class="kpi-value small">${diasTrabalhados}</div>
+                                        <div class="kpi-unit">Dias Trabalhados</div>
+                                    </div>
+                                     <div>
+                                        <div class="kpi-value small">${Math.round(mediaEstacasDia)}</div>
+                                        <div class="kpi-unit">Média Estacas/Dia</div>
+                                    </div>
+                                    <div>
+                                        <div class="kpi-value small">${formatNumber(mediaProducao)}</div>
+                                        <div class="kpi-unit">Média Diária (m)</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    const cardHtml = `
+                        <div class="obra-progress-card">
+                            <div class="obra-card-header">
+                                <div>
+                                    <h3>${nomeObra}</h3>
+                                    <div class="obra-coordinates">Lat: ${lat}, Lon: ${lon}</div>
+                                </div>
+                                <span class="details-toggle-icon">▼</span>
+                            </div>
+                            <div class="progress-info">
+                                <span>${drivenPiles} / ${totalPiles} estacas concluídas</span>
+                                ${previsaoHtml}
+                            </div>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar-text">${percentage.toFixed(1)}%</div>
+                                <div class="progress-bar" style="width: ${percentage}%;"></div>
+                            </div>
+                            <div class="section-progress-details">
+                                <h4>Progresso por Seção:</h4>
+                                ${detailsHtml || '<p>Nenhuma seção definida.</p>'}
+                            </div>
+                            <div class="equipamentos-list">
+                                <h4>Equipes na Obra:</h4>
+                                ${equipamentosListHtml || '<p>Nenhum equipamento registrado.</p>'}
+                            </div>
+                            <div class="collapsible-content">
+                                ${collapsibleContentHtml || ''}
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += cardHtml;
+                }
+            }
+
+            if (!hasOngoingWorks) {
+                container.innerHTML = '<p>Nenhuma obra "Em andamento" encontrada nos dados carregados.</p>';
+            }
+        }
+    </script>
+</body>
+</html>
