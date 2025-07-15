@@ -128,15 +128,12 @@
         #header-text-container h1 { color: var(--primary-color); font-size: 2em; font-weight: 600; }
         #header-text-container .subtitle { color: #666; font-size: 1.1em; margin-top: 5px; }
         
-        .upload-section { background: var(--card-bg); border-radius: 15px; padding: 25px; margin-bottom: 25px; box-shadow: var(--shadow); }
-        .upload-box { text-align: center; }
-        .file-upload { position: relative; display: inline-block; width: 100%; max-width: 500px; margin: 0 auto; }
-        .file-input { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
-        .file-label { display: block; padding: 15px 25px; background: linear-gradient(45deg, var(--primary-color), var(--secondary-color)); color: white; border-radius: 10px; text-align: center; cursor: pointer; transition: all 0.3s ease; font-size: 1.1em; }
-        .file-label:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0, 74, 153, 0.4); }
-        .file-status { margin-top: 15px; padding: 10px; border-radius: 8px; text-align: center; display: none; }
-        .file-status.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .file-status.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        #loading-indicator {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+            color: #555;
+        }
         
         .dashboard-content {
             display: none; /* Initially hidden */
@@ -414,6 +411,11 @@
                 </div>
             </header>
             
+            <div id="loading-indicator">
+                <h2>Carregando dados...</h2>
+                <p>Por favor, aguarde.</p>
+            </div>
+
             <main class="dashboard-content" id="dashboardContent">
                 <div id="tab-geral" class="tab-content active"></div>
                 <div id="tab-controle" class="tab-content"></div>
@@ -692,57 +694,41 @@
         const allSizeColumns = [...bateEstacaSizes, ...heliceSizes];
 
         // --- INICIALIZAÇÃO ---
-        const dashboardContent = document.getElementById('dashboardContent');
+        window.addEventListener('load', loadInitialData);
+        
+        // --- FUNÇÕES DE MANIPULAÇÃO DE DADOS ---
+        
+        function loadInitialData() {
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const dashboardContent = document.getElementById('dashboardContent');
+            fetch('Dados_Batessolo.json')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const production = data.dados_metragem || data.productionData;
+                    const costs = data.dados_custos || data.custos;
+                    const obrasData = data.dados_obras || data.obras_detalhadas;
 
-// Adiciona um listener que roda assim que a página é carregada
-document.addEventListener('DOMContentLoaded', function() {
-    // Busca o arquivo JSON que está na mesma pasta
-    fetch('Dados_Batessolo.json')
-        .then(response => {
-            // Verifica se o arquivo foi encontrado
-            if (!response.ok) {
-                throw new Error('Erro na rede ou arquivo não encontrado: ' + response.statusText);
-            }
-            // Converte a resposta para o formato JSON
-            return response.json();
-        })
-        .then(parsedData => {
-            // --- ESTA PARTE É IGUAL À LÓGICA QUE VOCÊ JÁ TINHA ---
-            try {
-                // Lógica para lidar com diferentes nomes de chave no JSON
-                const production = parsedData.dados_metragem || parsedData.productionData;
-                const costs = parsedData.dados_custos || parsedData.custos;
-                const obrasData = parsedData.dados_obras || parsedData.obras_detalhadas;
+                    if (!production || !costs || !obrasData) {
+                         throw new Error("Arquivo JSON inválido. Faltam as chaves corretas (ex: 'dados_metragem', 'dados_custos', 'dados_obras').");
+                    }
+                    
+                    processProductionData(production);
+                    processCostData(costs);
+                    allObrasData = obrasData.obras || obrasData;
 
-                if (!production || !costs || !obrasData) {
-                     throw new Error("Arquivo JSON inválido. Faltam chaves essenciais.");
-                }
-                
-                processProductionData(production);
-                processCostData(costs);
-                allObrasData = obrasData.obras || obrasData;
-
-                // Mostra o dashboard
-                dashboardContent.style.display = 'block';
-                initializeDashboard();
-
-            } catch (error) {
-                console.error("ERRO AO PROCESSAR OS DADOS DO ARQUIVO:", error);
-                alert(`Erro ao processar os dados: ${error.message}`);
-            }
-        })
-        .catch(error => {
-            // Captura erros de rede ou de parsing do JSON
-            console.error('Falha ao carregar o arquivo Dados_Batessolo.json:', error);
-            alert('Não foi possível carregar os dados do dashboard. Verifique o console para mais detalhes.');
-        });
-});
-
-        function showFileStatus(message, type, elementId = 'fileStatus') {
-            const statusEl = document.getElementById(elementId);
-            statusEl.textContent = message;
-            statusEl.className = `file-status ${type}`;
-            statusEl.style.display = 'block';
+                    loadingIndicator.style.display = 'none';
+                    dashboardContent.style.display = 'block';
+                    initializeDashboard();
+                })
+                .catch(error => {
+                    console.error("Erro ao carregar o arquivo de dados:", error);
+                    loadingIndicator.innerHTML = `<h2>❌ Erro ao carregar dados</h2><p>Verifique se o arquivo 'Dados_Batessolo.json' está na mesma pasta que este HTML e se o formato do JSON é válido. (${error.message})</p>`;
+                });
         }
         
         function cleanAndParseFloat(value) {
