@@ -414,17 +414,6 @@
                 </div>
             </header>
             
-            <section class="upload-section">
-                <div class="upload-box">
-                    <p style="margin-bottom: 10px; color: #666;">Carregue o arquivo de dados consolidado:</p>
-                    <div class="file-upload">
-                        <input type="file" id="singleFileInput" class="file-input" accept=".json">
-                        <label for="singleFileInput" class="file-label">📤 Carregar Dados_Batessolo.json</label>
-                    </div>
-                    <div id="fileStatus" class="file-status"></div>
-                </div>
-            </section>
-
             <main class="dashboard-content" id="dashboardContent">
                 <div id="tab-geral" class="tab-content active"></div>
                 <div id="tab-controle" class="tab-content"></div>
@@ -703,51 +692,51 @@
         const allSizeColumns = [...bateEstacaSizes, ...heliceSizes];
 
         // --- INICIALIZAÇÃO ---
-        const singleFileInput = document.getElementById('singleFileInput');
         const dashboardContent = document.getElementById('dashboardContent');
 
-        singleFileInput.addEventListener('change', handleSingleFileUpload);
-        
-        // --- FUNÇÕES DE MANIPULAÇÃO DE DADOS ---
-
-        function handleSingleFileUpload(event) {
-            const file = event.target.files[0];
-            const fileStatus = document.getElementById('fileStatus');
-            if (!file) return;
-            if (!file.name.toLowerCase().endsWith('.json')) {
-                showFileStatus('Erro: Arquivo deve ser .json', 'error');
-                return;
+// Adiciona um listener que roda assim que a página é carregada
+document.addEventListener('DOMContentLoaded', function() {
+    // Busca o arquivo JSON que está na mesma pasta
+    fetch('Dados_Batessolo.json')
+        .then(response => {
+            // Verifica se o arquivo foi encontrado
+            if (!response.ok) {
+                throw new Error('Erro na rede ou arquivo não encontrado: ' + response.statusText);
             }
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const parsedData = JSON.parse(e.target.result);
-                    
-                    // Lógica para lidar com diferentes nomes de chave no JSON
-                    const production = parsedData.dados_metragem || parsedData.productionData;
-                    const costs = parsedData.dados_custos || parsedData.custos;
-                    const obrasData = parsedData.dados_obras || parsedData.obras_detalhadas;
+            // Converte a resposta para o formato JSON
+            return response.json();
+        })
+        .then(parsedData => {
+            // --- ESTA PARTE É IGUAL À LÓGICA QUE VOCÊ JÁ TINHA ---
+            try {
+                // Lógica para lidar com diferentes nomes de chave no JSON
+                const production = parsedData.dados_metragem || parsedData.productionData;
+                const costs = parsedData.dados_custos || parsedData.custos;
+                const obrasData = parsedData.dados_obras || parsedData.obras_detalhadas;
 
-                    if (!production || !costs || !obrasData) {
-                         throw new Error("Arquivo JSON inválido. Faltam as chaves 'dados_metragem'/'productionData', 'dados_custos'/'custos' ou 'dados_obras'/'obras_detalhadas'.");
-                    }
-                    
-                    processProductionData(production);
-                    processCostData(costs);
-                    allObrasData = obrasData.obras || obrasData;
-
-                    document.querySelector('.upload-section').style.display = 'none';
-                    dashboardContent.style.display = 'block';
-                    showFileStatus('✅ Arquivo carregado com sucesso!', 'success');
-                    initializeDashboard();
-
-                } catch (error) {
-                    console.error("ERRO AO PROCESSAR ARQUIVO:", error);
-                    showFileStatus(`❌ Erro ao processar. ${error.message}`, 'error');
+                if (!production || !costs || !obrasData) {
+                     throw new Error("Arquivo JSON inválido. Faltam chaves essenciais.");
                 }
-            };
-            reader.readAsText(file, 'UTF-8');
-        }
+                
+                processProductionData(production);
+                processCostData(costs);
+                allObrasData = obrasData.obras || obrasData;
+
+                // Mostra o dashboard
+                dashboardContent.style.display = 'block';
+                initializeDashboard();
+
+            } catch (error) {
+                console.error("ERRO AO PROCESSAR OS DADOS DO ARQUIVO:", error);
+                alert(`Erro ao processar os dados: ${error.message}`);
+            }
+        })
+        .catch(error => {
+            // Captura erros de rede ou de parsing do JSON
+            console.error('Falha ao carregar o arquivo Dados_Batessolo.json:', error);
+            alert('Não foi possível carregar os dados do dashboard. Verifique o console para mais detalhes.');
+        });
+});
 
         function showFileStatus(message, type, elementId = 'fileStatus') {
             const statusEl = document.getElementById(elementId);
